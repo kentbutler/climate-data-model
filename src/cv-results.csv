@@ -1,0 +1,10 @@
+DateTime,TargetLabel,NumFeatures,WindowSize,TestPct,MSE,MAE,MAPE,Columns
+20231002-1141,LandAndOceanAverageTemperature,3,60,0.3,0.063580152620476,0.21475148329223,1.35797953605652,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+20231002-1150,LandAndOceanAverageTemperature,3,100,0.3,0.020819757517213,0.114103924827854,0.732917308807373,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+20231002-1158,LandAndOceanAverageTemperature,3,120,0.3,0.024090647642527,0.120354092915853,0.767854690551758,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+20231002-1207,LandAndOceanAverageTemperature,3,80,0.3,0.036769541681535,0.156892221292873,0.994934022426605,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+20231002-1220,LandAndOceanAverageTemperature,3,110,0.3,0.022115881449018,0.110428463432733,0.715987622737885,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+"20231002-1230",LandAndOceanAverageTemperature,3,110,0.3,0.019771309406409667,0.1116293977752447,0.7205071449279785,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+"20231002-1245",LandAndOceanAverageTemperature,3,110,0.2,0.031142938906133153,0.142615424315135,0.9115152359008789,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+"20231002-1307",LandAndOceanAverageTemperature,3,110,0.3,0.02159943532507697,0.11394153282586067,0.7291423678398132,"['LandAverageTemperature', 'LandMaxTemperature', 'LandMinTemperature', 'LandAndOceanAverageTemperature']"
+

@@ -35,12 +35,10 @@ import seaborn as sns; sns.set()
 plt.rcParams["figure.figsize"] = (10,6)
 import warnings
 
-# Import local source
-from projectutil import *
-
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn')
 # %matplotlib inline
+from projectutil import *
 
 class Dataset_Merger:
   """
@@ -75,7 +73,7 @@ class Dataset_Merger:
     df = self.load_data(filename)
     return self.merge_df(df, feature_map, df_aggr, impute_method, date_map, date_col, add_cyclic, filename)
 
-  def merge_df(self, df, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, add_cyclic=False , dataset_name='Unknown'):
+  def merge_df(self, df, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, add_cyclic=False, dataset_name='Unknown'):
     """
     Merge data in the given dataframe into given aggregated df.
     Crop data to given date bounds.
@@ -148,7 +146,6 @@ class Dataset_Merger:
     self.debug(f'pre-merge df::\n{df}')
     self.debug(f'pre-merge df_aggr::\n{df_aggr}')
 
-    self.debug(f'Cyclic:: {add_cyclic} for freq: {src_freq}')
     if (add_cyclic):
       # cyclicize date
       if (src_freq == 'D'):
@@ -201,7 +198,6 @@ class Dataset_Merger:
     df[COLS].isna().value_counts()
 
     for col in COLS:
-      #df[col].fillna(method=impute_method, inplace=True)
       df[col].fillna(method='ffill', inplace=True)
       df[col].fillna(method='bfill', inplace=True)
 
@@ -246,7 +242,7 @@ class Dataset_Merger:
     Given a column name, create a sinusoidal from it.
     """
     self.debug(f'Creating cyclic fields for {col}', banner=True)
-    # convert to radians
+   # convert to radian unit vals
     df[f'{col}-sin'] = np.sin(df[col] * (2 * np.pi / 12))
     df[f'{col}-cos'] = np.cos(df[col] * (2 * np.pi / 12))
     return df
@@ -353,7 +349,6 @@ class Dataset_Merger:
     plt.ylabel(filename)
     plt.title(f'{filename} over Time')
     plt.legend(COLS)
-    plt.ion()
     plt.show()
 
   def print_time_intervals(self, df):
@@ -554,10 +549,10 @@ MD_UNIT_TEST = False
 if MD_UNIT_TEST:
   debug = True
 
-  DRIVE_PATH = "/data/projects/data606/"
+  DRIVE_PATH = "/data/projects/climate-data-model"
 
   # Set the location of this script in GDrive
-  SCRIPT_PATH = DRIVE_PATH + "/src/"
+  SCRIPT_PATH = DRIVE_PATH + "/py-src/"
 
   # Root Path of the data on the cloud drive
   DATA_ROOT = DRIVE_PATH + "/data/"
@@ -579,7 +574,6 @@ if MD_UNIT_TEST:
   start_date =  pd.to_datetime(dt.fromisoformat('1990-01-01'))
   # Stop including data after this date
   end_date = pd.to_datetime(dt.fromisoformat('2020-12-31'))
-
 
 """**Case 1 - reference df**"""
 

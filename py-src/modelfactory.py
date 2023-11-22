@@ -12,16 +12,10 @@ Create models for easy lookup.
 
 FUTURE: use metaclass programming.
 """
-
-debug = True
-
-DRIVE_PATH = "/data/projects/data606"
-
-# Set the location of this script in GDrive
-SCRIPT_PATH = DRIVE_PATH + "/src/"
-
+# Import local source
 from model_densev1 import Model_Densev1
 from model_densev11 import Model_Densev11
+from model_lstmv1 import Model_LSTMv1
 from model_lstmv2 import Model_LSTMv2
 from model_lstmv21 import Model_LSTMv21
 from model_lstmv22 import Model_LSTMv22
@@ -29,17 +23,27 @@ from model_lstmv3 import Model_LSTMv3
 from model_lstmv31 import Model_LSTMv31
 from model_lstmv32 import Model_LSTMv32
 
+debug = True
+
+DRIVE_PATH = "/data/projects/climate-data-model"
+
+# Set the location of this script in GDrive
+SCRIPT_PATH = DRIVE_PATH + "/py-src/"
+
 class ModelFactory():
   """
   Construct a ModelFactory that provides keyword access to models for training.
   """
-  def __init__(self, window_size=30, num_labels=1, num_epochs=300, debug=False):
+  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, debug=False):
 
     self.debug = debug
 
     self.window_size = window_size
+    self.label_window = label_window
     self.num_labels = num_labels
     self.num_epochs = num_epochs
+
+    self.total_labels = label_window * num_labels
 
     self.init_models()
 
@@ -50,6 +54,7 @@ class ModelFactory():
     """
     return '\n'.join([
          f'window_size: {self.window_size}',
+         f'label_window: {self.label_window}',
          f'num_labels: {self.num_labels}',
          f'num_epochs: {self.num_epochs}'
         ])
@@ -62,51 +67,57 @@ class ModelFactory():
 
     #TODO please use something dynamic
     model = Model_Densev1(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
 
     model = Model_Densev11(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
+    self.models[model.get_name()] = model
 
+    model = Model_LSTMv1(window_size=self.window_size,
+                          label_window=self.label_window,
+                          num_labels=self.num_labels,
+                          num_epochs=self.num_epochs, debug=self.debug)
     self.models[model.get_name()] = model
 
     model = Model_LSTMv2(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
 
     model = Model_LSTMv21(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
 
     model = Model_LSTMv22(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
 
     model = Model_LSTMv3(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
-
     model = Model_LSTMv31(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
     model = Model_LSTMv32(window_size=self.window_size,
+                          label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
-
     self.models[model.get_name()] = model
+
 
   def get(self, model_name):
     return self.models[model_name]
@@ -134,7 +145,7 @@ if WG_UNIT_TEST:
   print(f'-------Case 2: get all models -----------')
   mf = ModelFactory()
 
-  models = ['Densev1','Densev11','LSTMv2','LSTMv21','LSTMv22','LSTMv3','LSTMv31','LSTMv32']
+  models = ["Densev1",'LSTMv1','LSTMv2','LSTMv3']
 
   for m in models:
     model = mf.get(m)

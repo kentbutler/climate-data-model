@@ -19,7 +19,7 @@ from datetime import datetime as dt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from keras.layers import Dense,RepeatVector, LSTM, Dropout
 from keras.layers import Flatten, Conv1D, MaxPooling1D
-from keras.layers import Bidirectional, Dropout
+from keras.layers import Bidirectional, Dropout, Reshape
 from keras.models import Sequential
 from keras.utils import plot_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, Callback, EarlyStopping
@@ -30,8 +30,9 @@ import tensorflow as tf
 class Model_LSTMv21:
   """
   """
-  def __init__(self, window_size=30, num_labels=1, num_epochs=300, debug=False):
+  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, debug=False):
     self.WINDOW_SIZE = window_size
+    self.LABEL_WINDOW = label_window
     self.NUM_LABELS = num_labels
     self.NUM_EPOCHS = num_epochs
     self.debug = debug
@@ -66,7 +67,11 @@ class Model_LSTMv21:
     model.add(LSTM(units=100, return_sequences=True, activation='tanh'))
     model.add(Bidirectional(LSTM(128, activation='tanh')))
     model.add(Dense(100, activation=leaky_relu))
-    model.add(Dense(1))
+    model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
+    if (self.LABEL_WINDOW > 1):
+      # reshape as => [batch, out_steps, labels]
+      model.add(Reshape([self.LABEL_WINDOW, self.NUM_LABELS]))
+
     model.compile(loss='mse', optimizer='adam')
 
     if (dataset is not None):

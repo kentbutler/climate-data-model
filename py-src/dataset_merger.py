@@ -43,11 +43,12 @@ from projectutil import *
 class Dataset_Merger:
   """
   """
-  def __init__(self, data_path, start_date, end_date, freq='1M', debug=False):
+  def __init__(self, data_path, start_date, end_date, freq='1M', plot=False, debug=False):
     self.data_path = data_path
     self.START_DATE = start_date
     self.END_DATE = end_date
     self.FREQ = freq
+    self.PLOT = plot
     self.DEBUG = debug
 
     if (len(data_path) <= 0):
@@ -163,7 +164,8 @@ class Dataset_Merger:
     df_merge = clean_df(df_merge, ['df'])
 
     # Plot Data
-    self.plot(df_merge, COLS, dataset_name)
+    if (self.PLOT):
+      self.plot(df_merge, COLS, dataset_name)
 
     return df_merge
 

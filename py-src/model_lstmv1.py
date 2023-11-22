@@ -47,6 +47,9 @@ class Model_LSTMv1:
   def get_name(self):
     return self.MODEL_NAME
 
+  def get_model(self):
+    return self.model
+
   def train(self, X_train=None, y_train=None, num_features=None, dataset=None):
     """
     Declare model and train.

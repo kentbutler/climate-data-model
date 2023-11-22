@@ -12,6 +12,7 @@ Create models for easy lookup.
 
 FUTURE: use metaclass programming.
 """
+from keras.models import load_model
 # Import local source
 from model_densev1 import Model_Densev1
 from model_densev11 import Model_Densev11
@@ -122,6 +123,30 @@ class ModelFactory():
   def get(self, model_name):
     return self.models[model_name]
 
+  def get_saved(self, model_path):
+    if (not model_path or model_path is None):
+      raise AssertionError('Model path must be provided')
+
+    # Load model to ensure we have a real model file
+    model = load_model(model_path)
+
+    # Determine what we called this model
+    model_name = None
+    for p in self.models.keys():
+      # terminate model name with separator -
+      # NOTE - highly dependent upon filename format!
+      if (str(f'{p}-') in model_path):
+        model_name = p
+        break
+    if (model_name is None):
+      # Could just log and return the hdf5 model
+      raise AssertionError('Model type could not be found')
+    # Fetch the model and make it usable
+    known_model = self.get(model_name)
+    known_model.set_model(model)
+    return known_model
+
+
 """---
 
 **Unit testing**
@@ -136,7 +161,7 @@ if WG_UNIT_TEST:
   print(f'-------Case 1: get single model -----------')
   mf = ModelFactory()
 
-  model = mf.get("Densev1")
+  model = mf.get("Densev11")
   assert(model)
   print(model)
 
@@ -151,3 +176,16 @@ if WG_UNIT_TEST:
     model = mf.get(m)
     assert(model)
     print(model)
+
+if WG_UNIT_TEST:
+
+  print(f'-------Case 3: load saved model -----------')
+  mf = ModelFactory()
+  # Load model
+  model = mf.get_saved('/data/projects/climate-data-model/data/preds-s7/20231122-0908-Densev11-228361.hdf5')
+  # Investigate
+  clsnm = type(model)
+  print(clsnm)
+  if ('model_densev11' not in str(clsnm)):
+    raise AssertionError(f'Wrong class: {clsnm}')
+  model.print_summary()

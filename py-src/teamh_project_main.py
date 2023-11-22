@@ -82,11 +82,11 @@ END_DATE = pd.to_datetime(dt.fromisoformat('2015-12-01'))
 """
 
 # History lookback in network
-INPUT_WINDOW = 30
+INPUT_WINDOW = 60
 # How far forward to predict
-LABEL_WINDOW = 1
+LABEL_WINDOW = 60
 # How many to move forward for start of next label
-SHIFT = 5
+SHIFT = 1
 # Ratio of test data to train data - used for split
 TEST_RATIO = 0.2
 # 0..1 percent of data to use as validation
@@ -563,8 +563,6 @@ plt.legend(('Test','Predicted'))
 
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-f
-
 # y_test_vals = y_test_vals.reshape(y_test_vals.shape[0],1)
 # preds = preds.reshape(preds.shape[0],1)
 # y_test_vals.shape, preds.shape
@@ -604,6 +602,6 @@ model.save_model(LOG_PATH, serial)
 
 with open(JOURNAL_LOG, 'a') as csvfile:
   writer = csv.writer(csvfile)
-  #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','WindowSize','TestPct','NumEpochs','MSE','MAE','MAPE','SKMAPE','Columns'])
-  writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,MODEL_NAME,TARGET_LABEL,NUM_FEATURES,INPUT_WINDOW,TEST_RATIO,num_epochs,mse,mae,mape,sk_mape,COLS])
+  #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','TestPct','NumEpochs','MSE','MAE','MAPE','SKMAPE','Columns'])
+  writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,MODEL_NAME,TARGET_LABEL,NUM_FEATURES,INPUT_WINDOW,LABEL_WINDOW,TEST_RATIO,num_epochs,mse,mae,mape,sk_mape,COLS])
 

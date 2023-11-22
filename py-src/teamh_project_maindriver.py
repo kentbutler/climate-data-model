@@ -60,19 +60,13 @@ from projectutil import *
 from modelexecutor import ModelExecutor
 
 
-debug = False
-
 DRIVE_PATH = "/data/projects/climate-data-model"
-
 # Set the location of this script in GDrive
 SCRIPT_PATH = DRIVE_PATH + "/py-src/"
-
 # Root Path of the data on the cloud drive
 DATA_ROOT = DRIVE_PATH + "/data/"
-
 # Location of logged output prediction data
 LOG_PATH = DATA_ROOT + "/preds/"
-
 # Journal file
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 
@@ -112,9 +106,9 @@ VOLCANO_DATA = {'filename':'eruptions-conditioned.csv',
                 'feature_map':{'vei':'volcanic_idx'},
                 'date_map':{'start_year':'year','start_month':'month'}}
 
-FOREST_DATA = {'filename':'WorldForestCover.csv',
-               'feature_map':{'PctCover':'pct_forest_cover'},
-               'date_map':{'Year':'year'}}
+FOREST_DATA = {'filename':'WorldForestCover-Interpolated.csv',
+               'feature_map':{'PctCover-Int':'pct_forest_cover'},
+               'date_col':'date'}
 
 SUNSPOT_DATA = {'filename':'sunspotnumber.csv',
                'feature_map':{'suns_spot_number':'sunspot_num'},
@@ -128,6 +122,13 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 #            'feature_map':{''},
 #            'date_map':{'Year':'year'}}
 
+"""**Run Parameters**"""
+
+debug = False
+show_graphics = False
+predict = False
+NUM_LOOPS = 10
+
 """**Hyperparams**"""
 
 SHIFT = 1
@@ -138,15 +139,20 @@ VALIDATION_RATIO = 0.1
 # Num epochs
 NUM_EPOCHS = 300
 
+# Turn off graphical blocking
+if (not show_graphics):
+  plt.ion()
+
 # History lookback in network
 #INPUT_WINDOWS = [30,45,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [48]
-LABEL_WINDOWS = [5]
+INPUT_WINDOWS = [60]
+LABEL_WINDOWS = [60]
 
 # Models to CV
 # 'Densev1',
-MODEL_NAMES = ['Densev11','LSTMv3']
+#MODEL_NAMES = ['Densev1','Densev11','LSTMv3','LSTMv32']
+MODEL_NAMES = ['Densev1','Densev11','LSTMv3','LSTMv32']
 
 ALL_DATASETS = [[CO2_DATA],
   [CO2_DATA,FOREST_DATA],
@@ -179,41 +185,41 @@ ALL_DATASETS = [[CO2_DATA],
   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA,POLICY_DATA]
 ]
 ALL_DATASETS = [
-  [VOLCANO_DATA,POLICY_DATA],
+  # [VOLCANO_DATA,POLICY_DATA],
 #  [VOLCANO_DATA,POLICY_DATA],
 #  [FOREST_DATA,POLICY_DATA],
 #  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA],
 #  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,CO2_DATA,POLICY_DATA],
 #  [CO2_DATA,SEAICE_DATA,WEATHER_DATA,VOLCANO_DATA,FOREST_DATA,POLICY_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
+#   [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
   [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
+  # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
+  # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
+  # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
+  # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
 ]
 #ALL_DATASETS=[ALL_DATASETS[0]]
-#ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
-ALL_DATASETS=[[SEAICE_DATA]]
+#ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]]
+#ALL_DATASETS=[[SEAICE_DATA]]
 
 """# Execute Trainer"""
+for n in range(NUM_LOOPS):
+  for i,win in enumerate(INPUT_WINDOWS):
+    for j, lab in enumerate(LABEL_WINDOWS):
+      for k,model in enumerate(MODEL_NAMES):
+        for m,ds_list in enumerate(ALL_DATASETS):
+          fnames = [ds['filename'] for ds in ds_list]
+          print(f'============================ Executing {i+j+k+m+n} ===================================\n{model}-{win}/{lab}-{fnames}')
 
-for i,win in enumerate(INPUT_WINDOWS):
-  for j, lab in enumerate(LABEL_WINDOWS):
-    for k,model in enumerate(MODEL_NAMES):
-      for m,ds_list in enumerate(ALL_DATASETS):
-        fnames = [ds['filename'] for ds in ds_list]
-        print(f'============================ Executing {i+j+k+m} ===================================\n{model}-{win}/{lab}-{fnames}')
+          # re-construct the model exec b/c it contains some state
+          exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
+                              input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
+                              num_epochs=NUM_EPOCHS, target_label=TARGET_LABEL, model_name=model, debug=True)
 
-        # re-construct the model exec b/c it contains some state
-        exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
-                            input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
-                            num_epochs=NUM_EPOCHS, target_label=TARGET_LABEL, model_name=model, debug=True)
+          exec.load_initial_dataset(TEMP_DATA['filename'], TEMP_DATA['feature_map'], date_map=None, date_col=TEMP_DATA['date_col'])
 
-        exec.load_initial_dataset(TEMP_DATA['filename'], TEMP_DATA['feature_map'], date_map=None, date_col=TEMP_DATA['date_col'])
+          exec.load_datasets(ds_list)
+          #exec.print_correlations()
+          exec.process()
 
-        exec.load_datasets(ds_list)
-        #exec.print_correlations()
-        exec.process()
-
-  print(f'=========================== Completed {i+j+k+m} ===================================')
+  print(f'=========================== Completed {i+j+k+m+n} ===================================')

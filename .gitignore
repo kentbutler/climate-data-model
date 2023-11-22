@@ -1,1 +1,4 @@
 py-src/cv-results.csv
+data/
+py-src/.idea/
+py-src/__pycache__/

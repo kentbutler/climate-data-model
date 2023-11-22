@@ -15,31 +15,16 @@ Original file is located at
 Multivariate usage of a Dense NN.
 """
 
-from datetime import datetime as dt
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 from keras.layers import Dense,MaxPooling1D
 from keras.layers import Flatten,RepeatVector,Reshape
 from keras.models import Sequential
-from keras.utils import plot_model
 from keras.callbacks import ModelCheckpoint, TensorBoard, Callback, EarlyStopping
+from model_base import Base_Model
 
-class Model_Densev11():
-  """
-  """
-  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, debug=False):
-    self.WINDOW_SIZE = window_size
-    self.LABEL_WINDOW = label_window
-    self.NUM_LABELS = num_labels
-    self.NUM_EPOCHS = num_epochs
-    self.debug = debug
-
-    self.MODEL_NAME = "Densev11"
-
-    if self.debug:
-      print(f'### Building Model{self.MODEL_NAME}::')
+class Model_Densev11(Base_Model):
 
   def get_name(self):
-    return self.MODEL_NAME
+    return "Densev11"
 
   def train(self, X_train=None, y_train=None, num_features=None, dataset=None):
     """
@@ -66,18 +51,3 @@ class Model_Densev11():
       self.model_hist = model.fit(X_train, y_train, epochs=self.NUM_EPOCHS, verbose=1, callbacks = [early_stop] )
     self.model = model
     return self.model_hist
-
-  def get_model_name(self, serial=None):
-    return f"{dt.today().strftime('%Y%m%d-%H%M')}-{self.MODEL_NAME}-{serial if serial is not None else '0'}.hdf5"
-
-  def save_model(self, path, serial=None):
-    """
-    Save the current model under the given drive path.
-    Timestamp the model name.
-    """
-    fname = f'{path}{self.get_model_name(serial)}'
-    print(f'Saving model to: {fname}')
-    return self.model.save(fname)
-
-  def predict(self, X_in):
-    return self.model.predict(X_in)

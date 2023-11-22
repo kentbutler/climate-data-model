@@ -11,20 +11,23 @@ Original file is located at
 Graph results of climate prediction data captured via CSV data.
 """
 
-
+## ------------------------------
+## Run parameters
 debug = False
+SHOW_SERIAL = 0   # set to 0 to show just the best
+## ------------------------------
 
-DRIVE_PATH = "/data/projects/data606"
+DRIVE_PATH = "/data/projects/climate-data-model/"
 
 # Set the location of this script in GDrive
-SCRIPT_PATH = DRIVE_PATH + "/src/"
+SCRIPT_PATH = DRIVE_PATH + "py-src/"
 
 # Location of run data
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
-DATA_ROOT = DRIVE_PATH + "/data/preds/"
+DATA_ROOT = DRIVE_PATH + "data/preds/"
 # -- load a particular result set --
-#DATA_ROOT = DRIVE_PATH + "/data/preds-s4/"
-#JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+# DATA_ROOT = DRIVE_PATH + "data/preds/"
+# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 
 # Colors for rendering
@@ -33,7 +36,7 @@ colors = 'rbygm'
 # Visualization params
 METRIC = 'MSE'
 
-GROUP_COLS = ['TargetLabel','WindowSize','TestPct','Columns']
+GROUP_COLS = ['TargetLabel','InputWindow','LabelWindow','TestPct','Columns']
 TGT_LABEL = 0
 WIND_SIZE = 1
 TEST_PCT = 2
@@ -66,8 +69,6 @@ plt.title(f'{METRIC} for all Serials')
 
 
 TICK_SPACING=6
-#MAX_GRAPHS=10
-#num_graphs = (MAX_GRAPHS if df.shape[0] >= MAX_GRAPHS else df.shape[0])
 #fig, axs = plt.subplots(num_graphs, 1, figsize=(9,(num_graphs*6)), layout="constrained")
 
 #import matplotlib
@@ -86,11 +87,10 @@ for i,s in enumerate(df.index.values):
   model = cur_row['Model']
   epochs = cur_row['NumEpochs']
 
-  #if (mse > .021):
-  #    continue
-
-  if (serial != 674022):
+  if (SHOW_SERIAL > 0 and serial != SHOW_SERIAL):
     continue
+  elif (mse > .021):
+     continue
 
   fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")
 

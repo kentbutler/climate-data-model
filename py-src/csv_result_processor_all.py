@@ -20,11 +20,11 @@ DRIVE_PATH = "/data/projects/data606"
 SCRIPT_PATH = DRIVE_PATH + "/src/"
 
 # Location of run data
-#JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
-#DATA_ROOT = DRIVE_PATH + "/data/preds/"
+JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
+DATA_ROOT = DRIVE_PATH + "/data/preds/"
 # -- load a particular result set --
-DATA_ROOT = DRIVE_PATH + "/data/preds-s4/"
-JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+#DATA_ROOT = DRIVE_PATH + "/data/preds-s4/"
+#JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 
 # Colors for rendering

@@ -12,10 +12,6 @@ Graph results of climate prediction data captured via CSV data.
 """
 
 ## ------------------------------
-## Run parameters
-debug = False
-SHOW_SERIAL = 0   # set to 0 to show just the best
-## ------------------------------
 
 DRIVE_PATH = "/data/projects/climate-data-model/"
 
@@ -25,10 +21,18 @@ SCRIPT_PATH = DRIVE_PATH + "py-src/"
 # Location of run data
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 DATA_ROOT = DRIVE_PATH + "data/preds/"
-# -- load a particular result set --
-# DATA_ROOT = DRIVE_PATH + "data/preds/"
-# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
+## ------------------------------
+## Run parameters
+debug = False
+# Plot a certain result??  0 for all
+SHOW_SERIAL = 0   # set to 0 to show just the best
+# -- UNCOMMENT to load a particular result set --
+DATA_ROOT = DRIVE_PATH + "data/preds-s10/"
+JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+
+MSE_THRESHOLD = 0.021
+## ------------------------------
 
 # Colors for rendering
 colors = 'rbygm'
@@ -36,7 +40,7 @@ colors = 'rbygm'
 # Visualization params
 METRIC = 'MSE'
 
-GROUP_COLS = ['TargetLabel','InputWindow','LabelWindow','TestPct','Columns']
+GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures']
 TGT_LABEL = 0
 WIND_SIZE = 1
 TEST_PCT = 2
@@ -51,31 +55,44 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
+# Attempt to offboard graphics to Qt5
+#import matplotlib
+#matplotlib.use('Qt5Agg')
+#from display_window import DispApp
+#disp = DispApp(fig)
+
 DATE_COL = 'pred_dates'
+TICK_SPACING=6
 
+# Load CSV overall results
 df = pd.read_csv(JOURNAL_LOG)
-df_net = df.groupby(GROUP_COLS)[METRIC].all()
-
 # Delete rows w/o a real serial
 df = df[df['Serial'] > 10]
 
+#--------- Plot 1 ------------
+# All MSE bar graph
 plt.rcParams["figure.figsize"] = [18,6]
 sns.barplot(x=df['Serial'], y=df[METRIC])
 #plt.plot(df[COLS])
 plt.xlabel('Serial')
 plt.xticks(rotation=90)
 plt.ylabel(METRIC)
-plt.title(f'{METRIC} for all Serials')
+plt.title(f'All {METRIC} per Serial')
 
+#--------- Plot 2 ------------
+#  Pull highlights per group
+df_net = df.groupby(GROUP_COLS).mean()
+# get values out of index
+df_net.reset_index(inplace=True)
+# create X labels
+df_net['label'] = df_net.apply(lambda x: f"{x['Model']}-{x.InputWindow}-{x.LabelWindow}-{x.NumFeatures}", axis=1)
+fig, ax = plt.subplots(1, 1, figsize=(6, 5), layout="constrained")
+sns.barplot(x=df_net['label'], y=df_net[METRIC], ax=ax)
+ax.set_xticks(df_net.index, labels=df_net.label, rotation=90)
+plt.title(f'Mean {METRIC} per Param Set')
 
-TICK_SPACING=6
-#fig, axs = plt.subplots(num_graphs, 1, figsize=(9,(num_graphs*6)), layout="constrained")
-
-#import matplotlib
-#matplotlib.use('Qt5Agg')
-#from display_window import DispApp
-#disp = DispApp(fig)
-
+#--------- Plot 3 ------------
+# Selection of serial results as line plots
 for i,s in enumerate(df.index.values):
   cur_row = df.loc[s]
   serial = cur_row['Serial']
@@ -89,7 +106,7 @@ for i,s in enumerate(df.index.values):
 
   if (SHOW_SERIAL > 0 and serial != SHOW_SERIAL):
     continue
-  elif (mse > .021):
+  elif (mse > MSE_THRESHOLD):
      continue
 
   fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")

@@ -135,7 +135,7 @@ SUNSPOT_DATA = {'filename':'sunspotnumber.csv',
                'date_map':{'year':'year'}}
 
 POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
-               'feature_map':{'EventRating':'policy_rate'},
+               'feature_map':{'EventRating':'policy_rating'},
                'date_col':'date'}
 
 #GHG_DATA = {'filename':'greenhouse_gas_inventory_data.csv',
@@ -143,7 +143,7 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 #            'date_map':{'Year':'year'}}
 #ALL_DATASETS = []
 #ALL_DATASETS = [SUNSPOT_DATA]
-ALL_DATASETS = [FOREST_DATA]
+ALL_DATASETS = [FOREST_DATA, POLICY_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA]
@@ -179,7 +179,7 @@ plt.style.use('seaborn')
 """
 
 # Declare a merger compatible with our source data and our target dataset we want to merge into
-merger = Dataset_Merger(data_path=DATA_ROOT, start_date=START_DATE, end_date=END_DATE, debug=True)
+merger = Dataset_Merger(data_path=DATA_ROOT, start_date=START_DATE, end_date=END_DATE, plot=True, debug=True)
 
 # Start by merging initial dataset
 df_merge = merger.merge_dataset(TEMP_DATA['filename'],

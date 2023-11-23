@@ -27,11 +27,11 @@ class Base_Model():
     Print object stats.
     """
     return '\n'.join([
-         f'window_size: {self.WINDOW_SIZE}',
-         f'label_window: {self.LABEL_WINDOW}',
-         f'num_labels: {self.NUM_LABELS}',
-         f'num_epochs: {self.NUM_EPOCHS}'
-        ])
+         f'Model: {self.get_name()}',
+         f'\twindow_size: {self.WINDOW_SIZE}',
+         f'\tlabel_window: {self.LABEL_WINDOW}',
+         f'\tnum_labels: {self.NUM_LABELS}',
+         f'\tnum_epochs: {self.NUM_EPOCHS}'])
 
   def get_name(self):
     """

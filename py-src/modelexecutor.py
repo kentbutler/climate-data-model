@@ -498,8 +498,8 @@ class ModelExecutor():
 
     ##"""**Test Predictions**"""
 
-    num_predictions = y_test.shape[0]-self.INPUT_WINDOW-self.LABEL_WINDOW
-    print(f'Num Exp. Predictions: {num_predictions} == {y_test.shape[0]} - {self.INPUT_WINDOW}')
+    num_predictions = max(y_test.shape[0]-self.INPUT_WINDOW-self.LABEL_WINDOW, 1)
+    print(f'Num Exp. Predictions: {num_predictions} == {y_test.shape[0]}-{self.INPUT_WINDOW}-{self.LABEL_WINDOW}')
 
     preds = []
     pred_dates = []

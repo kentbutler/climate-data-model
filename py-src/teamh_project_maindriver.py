@@ -115,7 +115,7 @@ SUNSPOT_DATA = {'filename':'sunspotnumber.csv',
                'date_map':{'year':'year'}}
 
 POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
-               'feature_map':{'EventRating':'policy_rate'},
+               'feature_map':{'EventRating':'policy_rating'},
                'date_col':'date'}
 
 #GHG_DATA = {'filename':'greenhouse_gas_inventory_data.csv',
@@ -146,13 +146,13 @@ if (not show_graphics):
 # History lookback in network
 #INPUT_WINDOWS = [30,45,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [60]
+INPUT_WINDOWS = [84]
 LABEL_WINDOWS = [60]
 
 # Models to CV
 # 'Densev1',
 #MODEL_NAMES = ['Densev1','Densev11','LSTMv3','LSTMv32']
-MODEL_NAMES = ['Densev1','Densev11','LSTMv3','LSTMv32']
+MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
 
 ALL_DATASETS = [[CO2_DATA],
   [CO2_DATA,FOREST_DATA],

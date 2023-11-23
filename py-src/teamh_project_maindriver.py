@@ -146,7 +146,7 @@ if (not show_graphics):
 # History lookback in network
 #INPUT_WINDOWS = [30,45,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [84]
+INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
 
 # Models to CV

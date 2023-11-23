@@ -22,17 +22,17 @@ SCRIPT_PATH = DRIVE_PATH + "py-src/"
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 DATA_ROOT = DRIVE_PATH + "data/preds/"
 
-## ------------------------------
+## ###############################
 ## Run parameters
 debug = False
 # Plot a certain result??  0 for all
-SHOW_SERIAL = 0   # set to 0 to show just the best
+SHOW_SERIAL = 915395   # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-DATA_ROOT = DRIVE_PATH + "data/preds-s10/"
+DATA_ROOT = DRIVE_PATH + "data/preds-s9/"
 JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 MSE_THRESHOLD = 0.021
-## ------------------------------
+## ###############################
 
 # Colors for rendering
 colors = 'rbygm'
@@ -93,6 +93,8 @@ plt.title(f'Mean {METRIC} per Param Set')
 
 #--------- Plot 3 ------------
 # Selection of serial results as line plots
+HILITE_COLS = ['Model','InputWindow','LabelWindow','Columns']
+
 for i,s in enumerate(df.index.values):
   cur_row = df.loc[s]
   serial = cur_row['Serial']
@@ -111,24 +113,20 @@ for i,s in enumerate(df.index.values):
 
   fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")
 
-  #print(f'Reading results for serial: {serial}')
+  # Load Data
   df_stats = pd.read_csv(DATA_ROOT + f'model-preds-{serial}.csv')
-  # Save numeric index off, could be handy
-  index=df_stats.index.values
-  #...but drop it
+  # Condition
   df_stats.drop(columns=['index'],inplace=True)
   df_stats.set_index('pred_dates', drop=True, inplace=True)
-
-  # Plot the stats
-  sns.lineplot(data=df_stats[['y_test','preds']], ax=ax)
-
+  df_stats.rename(columns={'preds':'Predictions'},inplace=True)
+  # Plot
+  sns.lineplot(data=df_stats, ax=ax, markers=['o','v'])
+  # Annotate
   ax.set_xticks(df_stats.index, labels=df_stats.index, rotation=90)
   ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
   plt.xlabel('Time steps')
   plt.ylabel('Temp in degrees C')
-  ax.legend(('Test','Predicted'))
-
-  title_str = [f'{GROUP_COLS[t]}: {cur_row[GROUP_COLS[t]]}\n' for t in range(4)]
+  title_str = [f'{HILITE_COLS[t]}: {cur_row[HILITE_COLS[t]]}\n' for t in range(4)]
   title_str = ''.join(title_str)
   ax.set_title(f'({i}) Pred vs. Actual for Serial {serial}\n{title_str}')
   ax.annotate(f'Model: {model} MSE: {mse}   MAE: {mae} Epochs: {epochs}             ',
@@ -138,6 +136,5 @@ for i,s in enumerate(df.index.values):
               textcoords='offset pixels', # 'axes fraction', 'offset pixels'
               horizontalalignment='right'
               )
-  plt.legend(df_stats.columns)
-
+  ax.texts[0].set_size(10)
 plt.show()

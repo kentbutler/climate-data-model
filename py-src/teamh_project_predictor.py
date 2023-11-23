@@ -57,11 +57,11 @@ END_DATE = pd.to_datetime(dt.fromisoformat('2015-12-01'))
 
 """**Parameters**"""
 
-INPUT_WINDOW = 84
+INPUT_WINDOW = 60
 LABEL_WINDOW = 60
-MODEL_FILENAME = '20231122-1858-Densev11-170000.hdf5'
+MODEL_FILENAME = '20231122-1450-Densev1-915395.hdf5'
 MODEL_NAME = 'Densev11'
-MODEL_PATH = DATA_ROOT + "preds/"
+MODEL_PATH = DATA_ROOT + "preds-s9/"
 
 """**Dataset Definitions**"""
 

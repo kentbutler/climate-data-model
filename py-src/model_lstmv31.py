@@ -48,7 +48,7 @@ class Model_LSTMv31(Base_Model):
       # reshape as => [batch, out_steps, labels]
       model.add(Reshape([self.LABEL_WINDOW, self.NUM_LABELS]))
 
-    model.compile(loss='mae', optimizer='adam')
+    model.compile(loss='mse', optimizer='adam')
 
     if (dataset is not None):
       self.model_hist = model.fit(dataset, epochs=self.NUM_EPOCHS, callbacks = [early_stop], verbose=(1 if self.debug else 0))

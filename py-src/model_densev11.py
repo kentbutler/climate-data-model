@@ -45,7 +45,6 @@ class Model_Densev11(Base_Model):
     model.compile(loss='mae', optimizer='adam')
 
     if (dataset is not None):
-
       self.model_hist = model.fit(dataset, epochs=self.NUM_EPOCHS, callbacks = [early_stop], verbose=(1 if self.debug else 0))
     else:
       self.model_hist = model.fit(X_train, y_train, epochs=self.NUM_EPOCHS, verbose=1, callbacks = [early_stop] )

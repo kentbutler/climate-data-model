@@ -41,6 +41,7 @@ from datetime import datetime as dt
 import datetime
 import numpy as np
 import math
+import importlib
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, RobustScaler, PowerTransformer, \
   QuantileTransformer, Normalizer
@@ -86,7 +87,7 @@ plt.style.use('seaborn')
 
 class ModelExecutor():
 
-  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, debug=False):
+  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, debug=False):
     self.debug = debug
     self.DATA_PATH = data_path
     self.LOG_PATH = log_path
@@ -102,10 +103,13 @@ class ModelExecutor():
     self.TARGET_LABEL = target_label
     self.TARGET_LABELS = [target_label] # for future expansion
     self.MODEL_NAME = model_name
+    self.SCALER_NAME = scaler
+    self.ALPHA = alpha
 
     # Device to run on
     self.run_on_device =  'cpu' # 'cuda'
     # Other internal state
+    self.PLOT = False
     self.model_factory = None
     self.model = None
 
@@ -113,7 +117,7 @@ class ModelExecutor():
     # Declare a merger compatible with our source data and our target dataset we want to merge into
     self.merger = Dataset_Merger(data_path=self.DATA_PATH,
                             start_date=self.START_DATE, end_date=self.END_DATE,
-                            debug=self.debug)
+                            plot=self.PLOT, debug=self.debug)
 
     # Start by merging initial dataset
     if (date_map is not None):
@@ -223,9 +227,17 @@ class ModelExecutor():
 
     # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
 
+    # Dynamically build a scaler from name
+    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
+    module = importlib.import_module('sklearn.preprocessing')
+    ScalerClass = getattr(module, self.SCALER_NAME)
+    num_scaler = ScalerClass()
+    label_scaler = ScalerClass()
+    print(f'## Scaler type: {type(num_scaler)}')
+
     # Create small pipeline for numerical features
     numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                        ('scale', MinMaxScaler())])
+                                        ('scale', num_scaler)])
 
     # get names of numerical features
     con_lst = df_input.select_dtypes(include='number').columns.to_list()
@@ -237,12 +249,11 @@ class ModelExecutor():
     X_train_tx = column_transformer.fit_transform(df_input)
 
     # Transform labels
-    label_scaler = MinMaxScaler()
     y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
 
     if self.debug:
-      print(f'X_train_tx {X_train_tx.shape}: {X_train_tx[0]}')
-      print(f'y_train_tx {y_train_tx.shape}: {y_train_tx[0]}')
+      print(f'X_train_tx:: {X_train_tx.shape}: {X_train_tx[0]}')
+      print(f'y_train_tx:: {y_train_tx.shape}: {y_train_tx[0]}')
 
     ## """**Extract X**
 
@@ -419,9 +430,17 @@ class ModelExecutor():
 
     # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
 
+    # Dynamically build a scaler from name
+    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
+    module = importlib.import_module('sklearn.preprocessing')
+    ScalerClass = getattr(module, self.SCALER_NAME)
+    num_scaler = ScalerClass()
+    label_scaler = ScalerClass()
+    print(f'## Scaler type: {type(num_scaler)}')
+
     # Create small pipeline for numerical features
     numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                        ('scale', MinMaxScaler())])
+                                        ('scale', num_scaler)])
 
     # get names of numerical features
     con_lst = df_train.select_dtypes(include='number').columns.to_list()
@@ -436,7 +455,6 @@ class ModelExecutor():
     #X_train_tx.shape, X_test_tx.shape, X_val_tx.shape
 
     # Transform labels
-    label_scaler = MinMaxScaler()
     y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
 
     # Slice labels - we cannot predict anything inside the first INPUT_WINDOW
@@ -643,12 +661,12 @@ class ModelExecutor():
     ## """**Journal entry**"""
     with open(self.JOURNAL_LOG, 'a') as csvfile:
       writer = csv.writer(csvfile)
-      #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','TestPct','NumEpochs','MSE','MAE','MAPE','SKMAPE','Columns'])
-      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.TEST_RATIO,num_epochs,mse,mae,mape,sk_mape,COLS])
+      #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','MSE','MAE','MAPE','SKMAPE','Columns'])
+      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,mse,mae,mape,sk_mape,COLS])
 
     return serial
 
   def get_model_factory(self, num_labels):
     if (self.model_factory is None):
-      self.model_factory = ModelFactory(window_size=self.INPUT_WINDOW,label_window=self.LABEL_WINDOW,num_labels=num_labels,num_epochs=self.NUM_EPOCHS,debug=True)
+      self.model_factory = ModelFactory(window_size=self.INPUT_WINDOW,label_window=self.LABEL_WINDOW,num_labels=num_labels,num_epochs=self.NUM_EPOCHS,alpha=self.ALPHA,debug=True)
     return self.model_factory

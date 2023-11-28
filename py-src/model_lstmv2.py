@@ -8,7 +8,6 @@
 Multivariate usage of an LSTM.
 """
 
-from datetime import datetime as dt
 from keras.layers import Dense,RepeatVector, LSTM, Dropout, Reshape
 from keras.layers import Flatten, Conv1D, MaxPooling1D
 from keras.layers import Bidirectional, Dropout
@@ -32,20 +31,21 @@ class Model_LSTMv2(Base_Model):
     model.add(MaxPooling1D(pool_size=2))
     model.add(Flatten())
     model.add(RepeatVector(self.WINDOW_SIZE))
-    model.add(LSTM(units=100, return_sequences=True, activation='gelu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='gelu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='gelu'))
-    model.add(LSTM(units=100, return_sequences=True, activation='gelu'))
-    model.add(Bidirectional(LSTM(128, activation='gelu')))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(Bidirectional(LSTM(128, activation='relu')))
     model.add(Dense(100, activation='relu'))
     model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
+
     if (self.LABEL_WINDOW > 1):
       # reshape as => [batch, out_steps, labels]
       model.add(Reshape([self.LABEL_WINDOW, self.NUM_LABELS]))
 
-    model.compile(loss='mae', optimizer='adam')
+    model.compile(loss='mse', optimizer='adam')
 
     if (dataset is not None):
       self.model_hist = model.fit(dataset, epochs=self.NUM_EPOCHS, callbacks = [early_stop], verbose=(1 if self.debug else 0))

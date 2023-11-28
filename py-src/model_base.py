@@ -12,11 +12,12 @@ from datetime import datetime as dt
 class Base_Model():
   """
   """
-  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, debug=False):
+  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, alpha=1e-4, debug=False):
     self.WINDOW_SIZE = window_size
     self.LABEL_WINDOW = label_window
     self.NUM_LABELS = num_labels
     self.NUM_EPOCHS = num_epochs
+    self.ALPHA = alpha
     self.debug = debug
 
     if self.debug:
@@ -31,7 +32,8 @@ class Base_Model():
          f'\twindow_size: {self.WINDOW_SIZE}',
          f'\tlabel_window: {self.LABEL_WINDOW}',
          f'\tnum_labels: {self.NUM_LABELS}',
-         f'\tnum_epochs: {self.NUM_EPOCHS}'])
+         f'\tnum_epochs: {self.NUM_EPOCHS}',
+         f'\talpha: {self.ALPHA}'])
 
   def get_name(self):
     """

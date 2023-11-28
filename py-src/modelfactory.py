@@ -23,7 +23,7 @@ from model_lstmv22 import Model_LSTMv22
 from model_lstmv3 import Model_LSTMv3
 from model_lstmv31 import Model_LSTMv31
 from model_lstmv32 import Model_LSTMv32
-
+from model_transformerv1 import Model_Transformerv1
 debug = True
 
 DRIVE_PATH = "/data/projects/climate-data-model"
@@ -35,7 +35,7 @@ class ModelFactory():
   """
   Construct a ModelFactory that provides keyword access to models for training.
   """
-  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, debug=False):
+  def __init__(self, window_size=30, label_window=1, num_labels=1, num_epochs=300, alpha=1e-4, debug=False):
 
     self.debug = debug
 
@@ -43,7 +43,7 @@ class ModelFactory():
     self.label_window = label_window
     self.num_labels = num_labels
     self.num_epochs = num_epochs
-
+    self.ALPHA = alpha
     self.total_labels = label_window * num_labels
 
     self.init_models()
@@ -57,8 +57,9 @@ class ModelFactory():
          f'window_size: {self.window_size}',
          f'label_window: {self.label_window}',
          f'num_labels: {self.num_labels}',
-         f'num_epochs: {self.num_epochs}'
-        ])
+         f'num_epochs: {self.num_epochs}',
+         f'alpha: {self.ALPHA}'
+    ])
 
   def init_models(self):
     """
@@ -117,6 +118,11 @@ class ModelFactory():
                           label_window=self.label_window,
                           num_labels=self.num_labels,
                           num_epochs=self.num_epochs, debug=self.debug)
+    self.models[model.get_name()] = model
+    model = Model_Transformerv1(window_size=self.window_size,
+                          label_window=self.label_window,
+                          num_labels=self.num_labels,
+                          num_epochs=self.num_epochs, alpha=self.ALPHA, debug=self.debug)
     self.models[model.get_name()] = model
 
 

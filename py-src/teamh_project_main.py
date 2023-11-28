@@ -56,7 +56,8 @@ SCRIPT_PATH = DRIVE_PATH + "/py-src/"
 DATA_ROOT = DRIVE_PATH + "/data/"
 
 # Model to use
-MODEL_NAME = 'LSTMv3'
+# MODEL_NAME = 'LSTMv3'
+MODEL_NAME = 'TXERv1'
 
 # Location of logged output prediction data
 LOG_PATH = DATA_ROOT + "/preds/"
@@ -142,18 +143,18 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 #            'feature_map':{''},
 #            'date_map':{'Year':'year'}}
 #ALL_DATASETS = []
-#ALL_DATASETS = [SUNSPOT_DATA]
-ALL_DATASETS = [FOREST_DATA, POLICY_DATA]
+ALL_DATASETS = [SUNSPOT_DATA]
+# ALL_DATASETS = [FOREST_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA]
-#ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA]
+ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, POLICY_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, SEAICE_DATA]
-#ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA]
+# ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, POLICY_DATA]
 
 #ALL_DATASETS = [POLICY_DATA,CO2_DATA]
 
@@ -179,7 +180,7 @@ plt.style.use('seaborn')
 """
 
 # Declare a merger compatible with our source data and our target dataset we want to merge into
-merger = Dataset_Merger(data_path=DATA_ROOT, start_date=START_DATE, end_date=END_DATE, plot=True, debug=True)
+merger = Dataset_Merger(data_path=DATA_ROOT, start_date=START_DATE, end_date=END_DATE, debug=True)
 
 # Start by merging initial dataset
 df_merge = merger.merge_dataset(TEMP_DATA['filename'],
@@ -257,6 +258,9 @@ plt.title('Heatmap of correlation among variables', fontsize=20)
 # It's time to set date as index and remove from dataset
 df_merge.set_index(merger.DATE_COL, inplace=True, drop=True)
 
+# Remove piecemeal date fields as well
+df_merge.drop(columns=['day', 'month', 'year'], inplace=True)
+
 """**Assess Periodicity**
 
 ```
@@ -326,24 +330,40 @@ if debug:
 Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
 """
 
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
-from sklearn import preprocessing
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, RobustScaler, PowerTransformer,  QuantileTransformer, Normalizer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-import tensorflow as tf
+import importlib
+
+# Create scalers
+# MinMaxScaler - scales [0..1], very sensitive to outliers
+# StandardScaler - removes mean, scales to unit variance; mostly in [-2..4]; very sensitive to outliers
+# PowerTransformer - zero mean, unit variance
+# QuantileTransformer - [0..1], not sensitive to outliers
+# num_scaler = RobustScaler()
+# label_scaler = RobustScaler()
+
+# Dynamically build a scaler from name
+scaler_name = 'QuantileTransformer'
+
+module = importlib.import_module('sklearn.preprocessing')
+ScalerClass = getattr(module, scaler_name)
+num_scaler = ScalerClass()
+label_scaler = ScalerClass()
+print(f'## Num scaler used: {type(num_scaler)}')
 
 # Create small pipeline for numerical features
 numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                    ('scale', MinMaxScaler())])
+                                     ('scale', num_scaler)
+                                     ])
 
 # get names of numerical features
 con_lst = df_train.select_dtypes(include='number').columns.to_list()
-
 # Transformer for applying Pipelines
 column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
+
+print(f'## Transforming numerics: {con_lst}')
 
 # Transform data features
 X_train_tx = column_transformer.fit_transform(df_train)
@@ -352,8 +372,9 @@ X_val_tx = column_transformer.transform(df_val)
 X_train_tx.shape, X_test_tx.shape, X_val_tx.shape
 
 # Transform labels
-label_scaler = MinMaxScaler()
 y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
+
+# y_train_tx = y_train.values.reshape(-1, 1)
 
 # Slice labels - we cannot predict anything inside the first INPUT_WINDOW
 #y_train_tx = y_train_tx[INPUT_WINDOW:]
@@ -361,6 +382,14 @@ y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
 if debug:
   print(f'X_train_tx {X_train_tx.shape}: {X_train_tx[0]}')
   print(f'y_train_tx {y_train_tx.shape}: {y_train_tx[0]}')
+
+fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")
+df_plot = pd.DataFrame(data=X_train_tx, columns=df_train.columns.to_list())
+# df_plot['y_train'] = y_train_tx
+sns.lineplot(data=df_plot, ax=ax)
+plt.title(f'Input Scaled with {scaler_name}')
+plt.show()
+
 
 """**Extract X and y**
 

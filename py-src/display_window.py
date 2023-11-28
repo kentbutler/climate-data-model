@@ -1,7 +1,5 @@
 import sys
-import random
 import matplotlib
-import matplotlib.pyplot as plt
 
 from PyQt5.QtWidgets import (
                         QWidget,

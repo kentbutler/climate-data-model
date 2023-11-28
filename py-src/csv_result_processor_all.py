@@ -26,12 +26,12 @@ DATA_ROOT = DRIVE_PATH + "data/preds/"
 ## Run parameters
 debug = False
 # Plot a certain result??  0 for all
-SHOW_SERIAL = 915395   # set to 0 to show just the best
+SHOW_SERIAL = 0   # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-DATA_ROOT = DRIVE_PATH + "data/preds-s9/"
-JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+# DATA_ROOT = DRIVE_PATH + "data/preds-s11/"
+# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
-MSE_THRESHOLD = 0.021
+MSE_THRESHOLD = 0.1
 ## ###############################
 
 # Colors for rendering
@@ -40,7 +40,7 @@ colors = 'rbygm'
 # Visualization params
 METRIC = 'MSE'
 
-GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures']
+GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures','Scaler']
 TGT_LABEL = 0
 WIND_SIZE = 1
 TEST_PCT = 2
@@ -85,7 +85,7 @@ df_net = df.groupby(GROUP_COLS).mean()
 # get values out of index
 df_net.reset_index(inplace=True)
 # create X labels
-df_net['label'] = df_net.apply(lambda x: f"{x['Model']}-{x.InputWindow}-{x.LabelWindow}-{x.NumFeatures}", axis=1)
+df_net['label'] = df_net.apply(lambda x: f"{x['Model']}-{x.InputWindow}-{x.LabelWindow}-{x.NumFeatures}-{x.Scaler}", axis=1)
 fig, ax = plt.subplots(1, 1, figsize=(6, 5), layout="constrained")
 sns.barplot(x=df_net['label'], y=df_net[METRIC], ax=ax)
 ax.set_xticks(df_net.index, labels=df_net.label, rotation=90)
@@ -93,11 +93,12 @@ plt.title(f'Mean {METRIC} per Param Set')
 
 #--------- Plot 3 ------------
 # Selection of serial results as line plots
-HILITE_COLS = ['Model','InputWindow','LabelWindow','Columns']
+# HILITE_COLS = ['Model']
 
 for i,s in enumerate(df.index.values):
   cur_row = df.loc[s]
   serial = cur_row['Serial']
+  #print(f'### serial: {serial} ###')
   if (serial <= 10):
     continue
 
@@ -105,11 +106,13 @@ for i,s in enumerate(df.index.values):
   mae = round(float(cur_row['MAE']), 4)
   model = cur_row['Model']
   epochs = cur_row['NumEpochs']
+  scaler = cur_row['Scaler']
 
-  if (SHOW_SERIAL > 0 and serial != SHOW_SERIAL):
-    continue
+  if (SHOW_SERIAL > 0):
+    if (serial != SHOW_SERIAL):
+      continue
   elif (mse > MSE_THRESHOLD):
-     continue
+    continue
 
   fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")
 
@@ -122,14 +125,17 @@ for i,s in enumerate(df.index.values):
   # Plot
   sns.lineplot(data=df_stats, ax=ax, markers=['o','v'])
   # Annotate
+
   ax.set_xticks(df_stats.index, labels=df_stats.index, rotation=90)
   ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
   plt.xlabel('Time steps')
   plt.ylabel('Temp in degrees C')
-  title_str = [f'{HILITE_COLS[t]}: {cur_row[HILITE_COLS[t]]}\n' for t in range(4)]
-  title_str = ''.join(title_str)
+  title_str = f'In/Out Window: {cur_row["InputWindow"]}/{cur_row["LabelWindow"]}   Model: {cur_row["Model"]}\n\n'
+  # title_str_p = [f'{HILITE_COLS[t]}: {cur_row[HILITE_COLS[t]]}\n' for t in range(len(HILITE_COLS))]
+  # title_str = title_str + title_str_p
+  # title_str = ''.join(title_str)
   ax.set_title(f'({i}) Pred vs. Actual for Serial {serial}\n{title_str}')
-  ax.annotate(f'Model: {model} MSE: {mse}   MAE: {mae} Epochs: {epochs}             ',
+  ax.annotate(f'MSE: {mse}   MAE: {mae} Epochs: {epochs} Scaler: {scaler}            \n{cur_row["Columns"]}',
               xy=(1,1),  # point to annotate - see xycoords for units
               xytext=(50, 10),  # offset from xy - units in textcoords
               xycoords='axes fraction',  # how coords are translated?

@@ -48,6 +48,7 @@ import datetime
 # Commented out IPython magic to ensure Python compatibility.
 import numpy as np
 import math
+import importlib
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 plt.rcParams["figure.figsize"] = (10,6)
@@ -127,7 +128,7 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 debug = False
 show_graphics = False
 predict = False
-NUM_LOOPS = 10
+NUM_LOOPS = 20
 
 """**Hyperparams**"""
 
@@ -148,11 +149,24 @@ if (not show_graphics):
 #INPUT_WINDOWS = [24,36,48]
 INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
+ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
+
+# Dynamically build a scaler from name
+# SCALERS = ['StandardScaler','MinMaxScaler','PowerTransformer','QuantileTransformer','RobustScaler']
+SCALERS = ['RobustScaler']
+#  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
+#    to reverse it you need to retain, and multiply by, w
+  # w = np.sqrt(sum(x**2))
+  # x_norm2 = x/w
+  # print x_norm2
+
 
 # Models to CV
 # 'Densev1',
-#MODEL_NAMES = ['Densev1','Densev11','LSTMv3','LSTMv32']
-MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
+# MODEL_NAMES = ['Densev1','Densev11','LSTMv1','LSTMv2','LSTMv21','LSTMv22','LSTMv3','LSTMv31','LSTMv32']
+# MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
+#MODEL_NAMES = ['LSTMv3','LSTMv31','LSTMv32']
+MODEL_NAMES = ['TXERv1']
 
 ALL_DATASETS = [[CO2_DATA],
   [CO2_DATA,FOREST_DATA],
@@ -185,41 +199,44 @@ ALL_DATASETS = [[CO2_DATA],
   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA,POLICY_DATA]
 ]
 ALL_DATASETS = [
-  # [VOLCANO_DATA,POLICY_DATA],
+  [CO2_DATA],
 #  [VOLCANO_DATA,POLICY_DATA],
 #  [FOREST_DATA,POLICY_DATA],
-#  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA],
-#  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,CO2_DATA,POLICY_DATA],
-#  [CO2_DATA,SEAICE_DATA,WEATHER_DATA,VOLCANO_DATA,FOREST_DATA,POLICY_DATA],
+ [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA],
+ [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA],
+ [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA,SUNSPOT_DATA],
 #   [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
-  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
+ [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
 ]
 #ALL_DATASETS=[ALL_DATASETS[0]]
-#ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]]
+# ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]]
 #ALL_DATASETS=[[SEAICE_DATA]]
+# ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
 
 """# Execute Trainer"""
 for n in range(NUM_LOOPS):
   for i,win in enumerate(INPUT_WINDOWS):
     for j, lab in enumerate(LABEL_WINDOWS):
       for k,model in enumerate(MODEL_NAMES):
-        for m,ds_list in enumerate(ALL_DATASETS):
-          fnames = [ds['filename'] for ds in ds_list]
-          print(f'============================ Executing {i+j+k+m+n} ===================================\n{model}-{win}/{lab}-{fnames}')
+        for m,scaler in enumerate(SCALERS):
+          for o,alpha in enumerate(ALPHAS):
+            for z,ds_list in enumerate(ALL_DATASETS):
+              fnames = [ds['filename'] for ds in ds_list]
+              print(f'============================ Executing {i+j+k+m+n+z} ===================================\n{model}-{win}/{lab}-{fnames}')
 
-          # re-construct the model exec b/c it contains some state
-          exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
-                              input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
-                              num_epochs=NUM_EPOCHS, target_label=TARGET_LABEL, model_name=model, debug=True)
+              # re-construct the model exec b/c it contains some state
+              exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
+                                  input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
+                                  num_epochs=NUM_EPOCHS, target_label=TARGET_LABEL, model_name=model, scaler=scaler, alpha=alpha, debug=True)
 
-          exec.load_initial_dataset(TEMP_DATA['filename'], TEMP_DATA['feature_map'], date_map=None, date_col=TEMP_DATA['date_col'])
+              exec.load_initial_dataset(TEMP_DATA['filename'], TEMP_DATA['feature_map'], date_map=None, date_col=TEMP_DATA['date_col'])
 
-          exec.load_datasets(ds_list)
-          #exec.print_correlations()
-          exec.process()
+              exec.load_datasets(ds_list)
+              #exec.print_correlations()
+              exec.process()
 
-  print(f'=========================== Completed {i+j+k+m+n} ===================================')
+  print(f'=========================== Completed {i+j+k+m+n+z} ===================================')

@@ -69,9 +69,9 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 run_on_device =  'cpu' # 'cuda'
 
 # Start including data from this date
-START_DATE =  pd.to_datetime(dt.fromisoformat('1950-01-01'))
+START_DATE =  pd.to_datetime(dt.fromisoformat('1850-01-01'))
 # Stop including data after this date
-END_DATE = pd.to_datetime(dt.fromisoformat('2015-12-01'))
+END_DATE = pd.to_datetime(dt.fromisoformat('2023-10-01'))
 
 """---
 
@@ -101,22 +101,34 @@ NUM_EPOCHS = 300
 TARGET_LABEL = 'landSeaAvgTemp'
 TARGET_LABELS = ['landSeaAvgTemp']
 
-# Base dataset
+# Datasets
 TEMP_DATA = {'filename':'GlobalTemperatures.csv',
              'feature_map':{'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
              'date_col':'dt'}
-#TEMP_DATA = {'filename':'GlobalTemperatures.csv',
-#              'feature_map':{'LandAverageTemperature':'landAvgTemp',	'LandMaxTemperature':'landMaxTemp',	'LandMinTemperature':'landMinTemp',	'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
-#               'date_col':'dt'}
 
+AIR_TEMP_DATA = {'filename':'berkeley-earth-temperature.Global_Land_and_Ocean_Air_Temps-groomed.csv',
+             'feature_map':{'GlobalAverageTemp':'landSeaAvgTemp'},
+             'date_col':'date'}
 
-# Datasets
 CO2_DATA = {'filename':"atmospheric-co2.csv",
             'feature_map':{'Carbon Dioxide (ppm)':'co2', 'Seasonally Adjusted CO2 (ppm)':'co2_seas'},
             'date_map':{'Year':'year','Month':'month'}}
 
+CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
+            'feature_map':{'co2':'co2'},
+                'date_col': 'date'}
+
+GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
+           'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
+                          'share_global_luc_co2':'share_global_luc_co2',
+                          'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
+                          'temperature_change_from_co2':'temperature_change_from_co2',
+                          'land_use_change_co2':'land_use_change_co2',
+                          'cumulative_luc_co2':'cumulative_luc_co2'},
+           'date_map':{'year':'year'}}
+
 SEAICE_DATA = {'filename':"seaice.csv",
-               'feature_map':{'     Extent':'ice_extent','    Missing':'ice_missing'},
+               'feature_map':{'     Extent':'ice_extent'},
                'date_map':{' Month':'month','Year':'year',' Day':'day'}}
 
 WEATHER_DATA = {'filename':"finalDatasetWithRain.csv",
@@ -143,20 +155,26 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 #            'feature_map':{''},
 #            'date_map':{'Year':'year'}}
 #ALL_DATASETS = []
-ALL_DATASETS = [SUNSPOT_DATA]
+# ALL_DATASETS = [SUNSPOT_DATA]
 # ALL_DATASETS = [FOREST_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA]
 #ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA]
-ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, POLICY_DATA]
+# ALL_DATASETS = [CO2_DATA, SEAICE_DATA, WEATHER_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, POLICY_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA]
 #ALL_DATASETS = [VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, SEAICE_DATA]
 # ALL_DATASETS = [CO2_DATA, SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, POLICY_DATA]
 
 #ALL_DATASETS = [POLICY_DATA,CO2_DATA]
+ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA]]
+
+
+# Base everything on this dataset
+INITIAL_DATASET = AIR_TEMP_DATA
+
 
 """# Data Load"""
 
@@ -183,13 +201,13 @@ plt.style.use('seaborn')
 merger = Dataset_Merger(data_path=DATA_ROOT, start_date=START_DATE, end_date=END_DATE, debug=True)
 
 # Start by merging initial dataset
-df_merge = merger.merge_dataset(TEMP_DATA['filename'],
-                                TEMP_DATA['feature_map'],
-                                 date_col=TEMP_DATA['date_col'],
+df_merge = merger.merge_dataset(INITIAL_DATASET['filename'],
+                                INITIAL_DATASET['feature_map'],
+                                 date_col=INITIAL_DATASET['date_col'],
                                  add_cyclic=True)
 
 # And store an indication of what our step scale is
-cols = list(TEMP_DATA['feature_map'].values())
+cols = list(INITIAL_DATASET['feature_map'].values())
 STEP_FREQ = merger.assess_granularity(df_merge, cols)
 
 print(assess_na(df_merge))
@@ -345,7 +363,7 @@ import importlib
 # label_scaler = RobustScaler()
 
 # Dynamically build a scaler from name
-scaler_name = 'QuantileTransformer'
+scaler_name = 'RobustScaler'
 
 module = importlib.import_module('sklearn.preprocessing')
 ScalerClass = getattr(module, scaler_name)

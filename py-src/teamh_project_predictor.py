@@ -68,19 +68,35 @@ MODEL_PATH = DATA_ROOT + "preds-s9/"
 # Label to predict
 TARGET_LABEL = 'landSeaAvgTemp'
 
-# Base dataset
+# Datasets
 TEMP_DATA = {'filename':'GlobalTemperatures.csv',
              'feature_map':{'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
              'date_col':'dt'}
 
-#TEMP_DATA = {'filename':'GlobalTemperatures.csv',
-#              'feature_map':{'LandAverageTemperature':'landAvgTemp',	'LandMaxTemperature':'landMaxTemp',	'LandMinTemperature':'landMinTemp',	'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
-#               'date_col':'dt'}
+AIR_TEMP_DATA = {'filename':'berkeley-earth-temperature.Global_Land_and_Ocean_Air_Temps-groomed.csv',
+             'feature_map':{'GlobalAverageTemp':'airPrefAvgTemp'},
+             'date_col':'date'}
 
-# Datasets
+SEA_TEMP_DATA = {'filename':'berkeley-earth-temperature.Global_Land_and_Ocean_Sea_Temps-groomed.csv',
+             'feature_map':{'GlobalAverageTemp':'seaPrefAvgTemp'},
+             'date_col':'date'}
+
 CO2_DATA = {'filename':"atmospheric-co2.csv",
             'feature_map':{'Carbon Dioxide (ppm)':'co2', 'Seasonally Adjusted CO2 (ppm)':'co2_seas'},
             'date_map':{'Year':'year','Month':'month'}}
+
+CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
+            'feature_map':{'co2':'co2'},
+                'date_col': 'date'}
+
+GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
+           'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
+                          'share_global_luc_co2':'share_global_luc_co2',
+                          'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
+                          'temperature_change_from_co2':'temperature_change_from_co2',
+                          'land_use_change_co2':'land_use_change_co2',
+                          'cumulative_luc_co2':'cumulative_luc_co2'},
+           'date_map':{'year':'year'}}
 
 SEAICE_DATA = {'filename':"seaice.csv",
                'feature_map':{'     Extent':'ice_extent'},
@@ -103,7 +119,7 @@ SUNSPOT_DATA = {'filename':'sunspotnumber.csv',
                'date_map':{'year':'year'}}
 
 POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
-               'feature_map':{'EventRating':'policy_rate'},
+               'feature_map':{'EventRating':'policy_rating'},
                'date_col':'date'}
 
 #GHG_DATA = {'filename':'greenhouse_gas_inventory_data.csv',

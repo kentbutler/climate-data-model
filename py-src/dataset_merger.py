@@ -225,7 +225,12 @@ class Dataset_Merger:
 
     elif (date_col is not None):
         self.debug(f'Convert from given col {date_col}')
-        df[self.DATE_COL] = pd.to_datetime(df[date_col])
+        try:
+          df[self.DATE_COL] = pd.to_datetime(df[date_col])
+        except:
+          self.debug ('Failure parsing dates - falling back to Python datestamps')
+          #TODO genericize
+          df[self.DATE_COL] = df[date_col].apply(lambda x: dt.strptime(x, '%d/%m/%Y'))
 
     # Ensure DATE_COL and year/month/date cols
     df = self.create_std_date(df)

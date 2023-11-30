@@ -31,14 +31,14 @@ SHOW_SERIAL = 0   # set to 0 to show just the best
 # DATA_ROOT = DRIVE_PATH + "data/preds-s11/"
 # JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
-MSE_THRESHOLD = 0.1
+RMSE_THRESHOLD = 0.45
 ## ###############################
 
 # Colors for rendering
 colors = 'rbygm'
 
 # Visualization params
-METRIC = 'MSE'
+METRIC = 'RMSE'
 
 GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures','Scaler']
 TGT_LABEL = 0
@@ -103,18 +103,25 @@ for i,s in enumerate(df.index.values):
     continue
 
   mse = round(float(cur_row['MSE']), 4)
+  rmse = round(float(cur_row['RMSE']), 4)
   mae = round(float(cur_row['MAE']), 4)
   model = cur_row['Model']
   epochs = cur_row['NumEpochs']
   scaler = cur_row['Scaler']
+  cols = cur_row["Columns"]
+
+  col_font = 8
+  if (len(cols) > 144):
+    # about the length of a 11-inch diag; if so, make columns font smaller
+    col_font = 6
 
   if (SHOW_SERIAL > 0):
     if (serial != SHOW_SERIAL):
       continue
-  elif (mse > MSE_THRESHOLD):
+  elif (rmse > RMSE_THRESHOLD):
     continue
 
-  fig, ax = plt.subplots(1, 1, figsize=(11,5), layout="constrained")
+  fig, ax = plt.subplots(1, 1, figsize=(11,6), layout="constrained")
 
   # Load Data
   df_stats = pd.read_csv(DATA_ROOT + f'model-preds-{serial}.csv')
@@ -135,12 +142,20 @@ for i,s in enumerate(df.index.values):
   # title_str = title_str + title_str_p
   # title_str = ''.join(title_str)
   ax.set_title(f'({i}) Pred vs. Actual for Serial {serial}\n{title_str}')
-  ax.annotate(f'MSE: {mse}   MAE: {mae} Epochs: {epochs} Scaler: {scaler}            \n{cur_row["Columns"]}',
+  ax.annotate(f'RMSE: {rmse}  MAE: {mae} Epochs: {epochs} Scaler: {scaler}            ',
               xy=(1,1),  # point to annotate - see xycoords for units
-              xytext=(50, 10),  # offset from xy - units in textcoords
+              xytext=(50, 25),  # offset from xy - units in textcoords
+              xycoords='axes fraction',  # how coords are translated?
+              textcoords='offset pixels', # 'axes fraction', 'offset pixels'
+              horizontalalignment='right'
+              )
+  ax.annotate(cols,
+              xy=(1,1),  # point to annotate - see xycoords for units
+              xytext=(50,10),  # offset from xy - units in textcoords
               xycoords='axes fraction',  # how coords are translated?
               textcoords='offset pixels', # 'axes fraction', 'offset pixels'
               horizontalalignment='right'
               )
   ax.texts[0].set_size(10)
+  ax.texts[1].set_size(col_font)
 plt.show()

@@ -410,11 +410,13 @@ class ModelExecutor():
     ## """**Split into Train/Test**"""
 
     df_train = self.df_merge.iloc[:NUM_TRAIN, :]
-    df_val = self.df_merge.iloc[NUM_TRAIN:NUM_TRAIN+NUM_VALIDATION, :]
+    if (self.VAL_RATIO > 0):
+      df_val = self.df_merge.iloc[NUM_TRAIN:NUM_TRAIN+NUM_VALIDATION, :]
     df_test = self.df_merge.iloc[NUM_TRAIN+NUM_VALIDATION:, :]
 
     y_train = df_train[self.TARGET_LABEL]
-    y_val = df_val[self.TARGET_LABEL]
+    if (self.VAL_RATIO > 0):
+      y_val = df_val[self.TARGET_LABEL]
     y_test = df_test[self.TARGET_LABEL]
 
     if self.debug:
@@ -422,8 +424,9 @@ class ModelExecutor():
       print(f'y_train: {y_train.shape}')
       print(f'df_test: {df_test.shape}')
       print(f'y_test: {y_test.shape}')
-      print(f'df_val: {df_val.shape}')
-      print(f'y_val: {y_val.shape}')
+      if (self.VAL_RATIO > 0):
+        print(f'df_val: {df_val.shape}')
+        print(f'y_val: {y_val.shape}')
 
 
     ## """**Scale data**
@@ -451,7 +454,8 @@ class ModelExecutor():
     # Transform data features
     X_train_tx = column_transformer.fit_transform(df_train)
     X_test_tx = column_transformer.transform(df_test)
-    X_val_tx = column_transformer.transform(df_val)
+    if (self.VAL_RATIO > 0):
+      X_val_tx = column_transformer.transform(df_val)
     #X_train_tx.shape, X_test_tx.shape, X_val_tx.shape
 
     # Transform labels
@@ -649,6 +653,7 @@ class ModelExecutor():
       print(f'ValueError calculating MAPE: {ve}')
 
     mse = mean_squared_error(y_test_vals, preds)
+    rmse = np.sqrt(mse) if (mse > 0) else 0
     mae = mean_absolute_error(y_test_vals, preds)
     mape = m.result().numpy()/100  # adjust Keras output to match scikit
     sk_mape = mean_absolute_percentage_error(y_test_vals, preds)
@@ -661,8 +666,8 @@ class ModelExecutor():
     ## """**Journal entry**"""
     with open(self.JOURNAL_LOG, 'a') as csvfile:
       writer = csv.writer(csvfile)
-      #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','MSE','MAE','MAPE','SKMAPE','Columns'])
-      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,mse,mae,mape,sk_mape,COLS])
+      #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','RMSE','MSE','MAE','MAPE','SKMAPE','Columns'])
+      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,rmse,mse,mae,mape,sk_mape,COLS])
 
     return serial
 

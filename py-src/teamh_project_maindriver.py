@@ -72,28 +72,44 @@ LOG_PATH = DATA_ROOT + "/preds/"
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 
 # Start including data from this date
-START_DATE =  pd.to_datetime(dt.fromisoformat('1950-01-01'))
+START_DATE =  pd.to_datetime(dt.fromisoformat('1850-01-01'))
 # Stop including data after this date
-END_DATE = pd.to_datetime(dt.fromisoformat('2015-12-01'))
+END_DATE = pd.to_datetime(dt.fromisoformat('2023-10-01'))
 
 """**Dataset Definitions**"""
 
 # Label to predict
-TARGET_LABEL = 'landSeaAvgTemp'
+TARGET_LABEL = 'airPrefAvgTemp'
 
-# Base dataset
+# Datasets
 TEMP_DATA = {'filename':'GlobalTemperatures.csv',
              'feature_map':{'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
              'date_col':'dt'}
 
-#TEMP_DATA = {'filename':'GlobalTemperatures.csv',
-#              'feature_map':{'LandAverageTemperature':'landAvgTemp',	'LandMaxTemperature':'landMaxTemp',	'LandMinTemperature':'landMinTemp',	'LandAndOceanAverageTemperature':'landSeaAvgTemp'},
-#               'date_col':'dt'}
+AIR_TEMP_DATA = {'filename':'berkeley-earth-temperature.Global_Land_and_Ocean_Air_Temps-groomed.csv',
+             'feature_map':{'GlobalAverageTemp':'airPrefAvgTemp'},
+             'date_col':'date'}
 
-# Datasets
+SEA_TEMP_DATA = {'filename':'berkeley-earth-temperature.Global_Land_and_Ocean_Sea_Temps-groomed.csv',
+             'feature_map':{'GlobalAverageTemp':'seaPrefAvgTemp'},
+             'date_col':'date'}
+
 CO2_DATA = {'filename':"atmospheric-co2.csv",
             'feature_map':{'Carbon Dioxide (ppm)':'co2', 'Seasonally Adjusted CO2 (ppm)':'co2_seas'},
             'date_map':{'Year':'year','Month':'month'}}
+
+CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
+            'feature_map':{'co2':'co2'},
+                'date_col': 'date'}
+
+GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
+           'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
+                          'share_global_luc_co2':'share_global_luc_co2',
+                          'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
+                          'temperature_change_from_co2':'temperature_change_from_co2',
+                          'land_use_change_co2':'land_use_change_co2',
+                          'cumulative_luc_co2':'cumulative_luc_co2'},
+           'date_map':{'year':'year'}}
 
 SEAICE_DATA = {'filename':"seaice.csv",
                'feature_map':{'     Extent':'ice_extent'},
@@ -119,6 +135,7 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
                'feature_map':{'EventRating':'policy_rating'},
                'date_col':'date'}
 
+
 #GHG_DATA = {'filename':'greenhouse_gas_inventory_data.csv',
 #            'feature_map':{''},
 #            'date_map':{'Year':'year'}}
@@ -126,7 +143,7 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 """**Run Parameters**"""
 
 debug = False
-show_graphics = False
+# show_graphics = True
 predict = False
 NUM_LOOPS = 20
 
@@ -136,24 +153,27 @@ SHIFT = 1
 # Ratio of test data to train data - used for split
 TEST_RATIO = 0.2
 # 0..1 percent of data to use as validation
-VALIDATION_RATIO = 0.1
+VALIDATION_RATIO = 0
 # Num epochs
 NUM_EPOCHS = 300
 
-# Turn off graphical blocking
-if (not show_graphics):
-  plt.ion()
+# NOTE: this is a tempting workaround to stop graphic popups, but it is deceptive.
+#     This will launch an empty frame per loop
+#     Rather, just feature flag plotting
+# if (not show_graphics):
+#   plt.ion()
 
 # History lookback in network
-#INPUT_WINDOWS = [30,45,60]
+#INPUT_WINDOWS = [30,48,60]
 #INPUT_WINDOWS = [24,36,48]
 INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
-ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
+# ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
+ALPHAS = [1e-4,5e-4,5e-5]
 
 # Dynamically build a scaler from name
-# SCALERS = ['StandardScaler','MinMaxScaler','PowerTransformer','QuantileTransformer','RobustScaler']
-SCALERS = ['RobustScaler']
+SCALERS = ['StandardScaler','MinMaxScaler','PowerTransformer','QuantileTransformer','RobustScaler']
+# SCALERS = ['RobustScaler']
 #  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
 #    to reverse it you need to retain, and multiply by, w
   # w = np.sqrt(sum(x**2))
@@ -163,59 +183,65 @@ SCALERS = ['RobustScaler']
 
 # Models to CV
 # 'Densev1',
-# MODEL_NAMES = ['Densev1','Densev11','LSTMv1','LSTMv2','LSTMv21','LSTMv22','LSTMv3','LSTMv31','LSTMv32']
+# MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
-#MODEL_NAMES = ['LSTMv3','LSTMv31','LSTMv32']
-MODEL_NAMES = ['TXERv1']
+# MODEL_NAMES = ['LSTMv3','LSTMv31','LSTMv32']
+# MODEL_NAMES = ['TXERv1']
+MODEL_NAMES = ['Densev11','TXERv1','LSTMv32']
 
-ALL_DATASETS = [[CO2_DATA],
-  [CO2_DATA,FOREST_DATA],
-  [CO2_DATA,SEAICE_DATA],
-  [CO2_DATA,POLICY_DATA],
-  [CO2_DATA,SEAICE_DATA,POLICY_DATA],
-  [CO2_DATA,SEAICE_DATA,WEATHER_DATA],
-  [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA],
-  [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA],
-  [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA,SUNSPOT_DATA],
-  [CO2_DATA,VOLCANO_DATA],
-  [CO2_DATA,VOLCANO_DATA,FOREST_DATA],
-  [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA],
-  [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
-  [CO2_DATA,FOREST_DATA],
-  [CO2_DATA,FOREST_DATA,SEAICE_DATA],
-  [CO2_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
-  [VOLCANO_DATA],
-  [VOLCANO_DATA,FOREST_DATA],
-  [VOLCANO_DATA,POLICY_DATA],
-  [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA],
-  [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA],
-  [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA,SEAICE_DATA],
-  [FOREST_DATA],
-  [FOREST_DATA,POLICY_DATA],
-  [SEAICE_DATA],
-  [SEAICE_DATA,FOREST_DATA],
-  [SEAICE_DATA,POLICY_DATA],
-  [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA],
-  [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA,POLICY_DATA]
-]
-ALL_DATASETS = [
-  [CO2_DATA],
+# Base everything on this dataset
+INITIAL_DATASET = AIR_TEMP_DATA
+
+# ALL_DATASETS = [[CO2_DATA],
+#   [CO2_DATA,FOREST_DATA],
+#   [CO2_DATA,SEAICE_DATA],
+#   [CO2_DATA,POLICY_DATA],
+#   [CO2_DATA,SEAICE_DATA,POLICY_DATA],
+#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA],
+#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA],
+#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA],
+#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA,SUNSPOT_DATA],
+#   [CO2_DATA,VOLCANO_DATA],
+#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA],
+#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA],
+#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
+#   [CO2_DATA,FOREST_DATA],
+#   [CO2_DATA,FOREST_DATA,SEAICE_DATA],
+#   [CO2_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
+#   [VOLCANO_DATA],
+#   [VOLCANO_DATA,FOREST_DATA],
+#   [VOLCANO_DATA,POLICY_DATA],
+#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA],
+#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA],
+#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA,SEAICE_DATA],
+#   [FOREST_DATA],
+#   [FOREST_DATA,POLICY_DATA],
+#   [SEAICE_DATA],
+#   [SEAICE_DATA,FOREST_DATA],
+#   [SEAICE_DATA,POLICY_DATA],
+#   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA],
+#   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA,POLICY_DATA]
+# ]
+# ALL_DATASETS = [
+#   [AIR_TEMP_DATA],
 #  [VOLCANO_DATA,POLICY_DATA],
 #  [FOREST_DATA,POLICY_DATA],
- [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA],
- [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA],
- [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA,SUNSPOT_DATA],
+#  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA],
+#  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA],
+#  [SEAICE_DATA,VOLCANO_DATA,FOREST_DATA,WEATHER_DATA,CO2_DATA,SUNSPOT_DATA],
 #   [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
- [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
+#  [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
   # [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA],
-]
-#ALL_DATASETS=[ALL_DATASETS[0]]
+# ]
 # ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]]
 #ALL_DATASETS=[[SEAICE_DATA]]
 # ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
+
+ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
+              [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
 
 """# Execute Trainer"""
 for n in range(NUM_LOOPS):
@@ -233,7 +259,7 @@ for n in range(NUM_LOOPS):
                                   input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
                                   num_epochs=NUM_EPOCHS, target_label=TARGET_LABEL, model_name=model, scaler=scaler, alpha=alpha, debug=True)
 
-              exec.load_initial_dataset(TEMP_DATA['filename'], TEMP_DATA['feature_map'], date_map=None, date_col=TEMP_DATA['date_col'])
+              exec.load_initial_dataset(INITIAL_DATASET['filename'], INITIAL_DATASET['feature_map'], date_map=None, date_col=INITIAL_DATASET['date_col'])
 
               exec.load_datasets(ds_list)
               #exec.print_correlations()

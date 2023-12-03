@@ -71,11 +71,6 @@ LOG_PATH = DATA_ROOT + "/preds/"
 # Journal file
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 
-# Start including data from this date
-START_DATE =  pd.to_datetime(dt.fromisoformat('1850-01-01'))
-# Stop including data after this date
-END_DATE = pd.to_datetime(dt.fromisoformat('2023-10-01'))
-
 """**Dataset Definitions**"""
 
 # Label to predict
@@ -98,9 +93,11 @@ CO2_DATA = {'filename':"atmospheric-co2.csv",
             'feature_map':{'Carbon Dioxide (ppm)':'co2', 'Seasonally Adjusted CO2 (ppm)':'co2_seas'},
             'date_map':{'Year':'year','Month':'month'}}
 
+# Contains data older than year 1645 - provide date format for using python dates
 CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
             'feature_map':{'co2':'co2'},
-                'date_col': 'date'}
+                'date_col': 'date',
+                'date_fmt': '%d/%m/%Y'}
 
 GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
            'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
@@ -169,59 +166,53 @@ NUM_EPOCHS = 300
 INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
-ALPHAS = [1e-4,5e-4,5e-5]
+# ALPHAS = [1e-4,5e-4,5e-5]
+ALPHAS = [1e-4,5e-4]
 
 # Dynamically build a scaler from name
-SCALERS = ['StandardScaler','MinMaxScaler','PowerTransformer','QuantileTransformer','RobustScaler']
-# SCALERS = ['RobustScaler']
+# SCALERS = ['StandardScaler','PowerTransformer','QuantileTransformer','RobustScaler']
+SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
 #  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
 #    to reverse it you need to retain, and multiply by, w
   # w = np.sqrt(sum(x**2))
   # x_norm2 = x/w
   # print x_norm2
 
+# Pair
+# SCALERS = ['RobustScaler']
+# MODEL_NAMES = ['Densev11']
+# Pair
+# SCALERS = ['StandardScaler']
+# MODEL_NAMES = ['LSTMv32']
+# Pair
+# SCALERS = ['MinMaxScaler']
+# MODEL_NAMES = ['TXERv1']
 
 # Models to CV
 # 'Densev1',
 # MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
 # MODEL_NAMES = ['LSTMv3','LSTMv31','LSTMv32']
-# MODEL_NAMES = ['TXERv1']
-MODEL_NAMES = ['Densev11','TXERv1','LSTMv32']
+MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
+
+
+# Start/stop including data from these dates
+# START_DATE =  pd.to_datetime('1950-01-01')
+# END_DATE = pd.to_datetime('2023-10-01')
+START_DATE =  pd.to_datetime('1850-01-01')
+END_DATE = pd.to_datetime('2023-10-01')
 
 # Base everything on this dataset
 INITIAL_DATASET = AIR_TEMP_DATA
 
-# ALL_DATASETS = [[CO2_DATA],
-#   [CO2_DATA,FOREST_DATA],
-#   [CO2_DATA,SEAICE_DATA],
-#   [CO2_DATA,POLICY_DATA],
-#   [CO2_DATA,SEAICE_DATA,POLICY_DATA],
-#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA],
-#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA],
-#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA],
-#   [CO2_DATA,SEAICE_DATA,WEATHER_DATA,FOREST_DATA,VOLCANO_DATA,SUNSPOT_DATA],
-#   [CO2_DATA,VOLCANO_DATA],
-#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA],
-#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA],
-#   [CO2_DATA,VOLCANO_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
-#   [CO2_DATA,FOREST_DATA],
-#   [CO2_DATA,FOREST_DATA,SEAICE_DATA],
-#   [CO2_DATA,FOREST_DATA,SEAICE_DATA,SUNSPOT_DATA],
-#   [VOLCANO_DATA],
-#   [VOLCANO_DATA,FOREST_DATA],
-#   [VOLCANO_DATA,POLICY_DATA],
-#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA],
-#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA],
-#   [VOLCANO_DATA,FOREST_DATA,SUNSPOT_DATA,POLICY_DATA,SEAICE_DATA],
-#   [FOREST_DATA],
-#   [FOREST_DATA,POLICY_DATA],
-#   [SEAICE_DATA],
-#   [SEAICE_DATA,FOREST_DATA],
-#   [SEAICE_DATA,POLICY_DATA],
-#   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA],
-#   [SEAICE_DATA,FOREST_DATA,VOLCANO_DATA,POLICY_DATA]
-# ]
+# Use case 1
+# ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
+
+# Use case 2
+# ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
+#               [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
+ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
+
 # ALL_DATASETS = [
 #   [AIR_TEMP_DATA],
 #  [VOLCANO_DATA,POLICY_DATA],
@@ -240,8 +231,6 @@ INITIAL_DATASET = AIR_TEMP_DATA
 #ALL_DATASETS=[[SEAICE_DATA]]
 # ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
 
-ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
-              [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
 
 """# Execute Trainer"""
 for n in range(NUM_LOOPS):

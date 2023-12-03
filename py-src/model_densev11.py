@@ -33,11 +33,11 @@ class Model_Densev11(Base_Model):
     early_stop = EarlyStopping(monitor = "loss", mode = "min", patience = 25)
     model = Sequential()
     model.add(MaxPooling1D(pool_size=2, input_shape=(self.WINDOW_SIZE, num_features)))
-    model.add(Dense(128, activation='gelu'))
-    model.add(Dense(128, activation='gelu'))
-    model.add(Dense(128, activation='gelu'))
+    model.add(Dense(128, activation='gelu', kernel_initializer='glorot_uniform'))
+    model.add(Dense(128, activation='gelu', kernel_initializer='glorot_uniform'))
+    model.add(Dense(128, activation='gelu', kernel_initializer='glorot_uniform'))
     model.add(Flatten())
-    model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
+    model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW, kernel_initializer='glorot_uniform'))
     if (self.LABEL_WINDOW > 1):
       # reshape as => [batch, out_steps, labels]
       model.add(Reshape([self.LABEL_WINDOW, self.NUM_LABELS]))

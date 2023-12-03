@@ -35,15 +35,15 @@ class Model_LSTMv1(Base_Model):
     model.add(MaxPooling1D(pool_size=2))
     model.add(Flatten())
     model.add(RepeatVector(30))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu', kernel_initializer='glorot_uniform'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu', kernel_initializer='glorot_uniform'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu', kernel_initializer='glorot_uniform'))
+    model.add(LSTM(units=100, return_sequences=True, activation='relu', kernel_initializer='glorot_uniform'))
     model.add(Bidirectional(LSTM(128, activation='relu')))
-    model.add(Dense(100, activation='relu'))
-    model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
+    model.add(Dense(100, activation='relu', kernel_initializer='glorot_uniform'))
+    model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW, kernel_initializer='glorot_uniform'))
 
     if (self.LABEL_WINDOW > 1):
       # reshape as => [batch, out_steps, labels]

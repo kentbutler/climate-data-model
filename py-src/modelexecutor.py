@@ -133,6 +133,11 @@ class ModelExecutor():
 
   def load_datasets(self, ds_list):
     for dataset in ds_list:
+      # Resolve date format - usually this will be empty
+      date_fmt = None
+      if ('date_fmt' in dataset):
+        date_fmt = dataset['date_fmt']
+
       if ('date_map' in dataset):
         self.df_merge = self.merger.merge_dataset(dataset['filename'],
                                         feature_map=dataset['feature_map'],
@@ -142,7 +147,8 @@ class ModelExecutor():
         self.df_merge = self.merger.merge_dataset(dataset['filename'],
                                     feature_map=dataset['feature_map'],
                                     df_aggr=self.df_merge,
-                                    date_col=dataset['date_col'])
+                                    date_col=dataset['date_col'],
+                                    date_fmt=date_fmt)
 
       if (self.debug):
         print(self.df_merge)

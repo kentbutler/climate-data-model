@@ -62,7 +62,7 @@ class Dataset_Merger:
     # Ordinal set for scale levels, used for comparison
     self.FREQ_SCALE = {'Y':0, 'M':1, 'D':2}
 
-  def merge_dataset(self, filename, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, add_cyclic=False):
+  def merge_dataset(self, filename, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, date_fmt=None, add_cyclic=False):
     """
     Load data from the given data_path.
     Crop data to given date bounds.
@@ -72,9 +72,9 @@ class Dataset_Merger:
     Merge into given df_aggr.
     """
     df = self.load_data(filename)
-    return self.merge_df(df, feature_map, df_aggr, impute_method, date_map, date_col, add_cyclic, filename)
+    return self.merge_df(df, feature_map, df_aggr, impute_method, date_map, date_col, date_fmt, add_cyclic, filename)
 
-  def merge_df(self, df, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, add_cyclic=False, dataset_name='Unknown'):
+  def merge_df(self, df, feature_map, df_aggr=None, impute_method='ffill', date_map=None, date_col=None, date_fmt=None, add_cyclic=False, dataset_name='Unknown'):
     """
     Merge data in the given dataframe into given aggregated df.
     Crop data to given date bounds.
@@ -106,7 +106,7 @@ class Dataset_Merger:
 
     # Groom Dates
     # - create std date column
-    df = self.preprocess_dates(df, date_col)
+    df = self.preprocess_dates(df, date_col, date_fmt)
 
     # Drop unnecessary columns    if (target_freq <= src_freq):
 
@@ -131,7 +131,7 @@ class Dataset_Merger:
 #      df = self.downscale(df, columns=COLS)
 #    else:
 #      df = self.upscale(df, columns=COLS)
-    df = self.downscale(df, src_freq_val, columns=COLS)
+    df = self.downscale(df, src_freq_val, columns=COLS, date_fmt=date_fmt)
 
     # Impute Missing Data
     df = self.handle_missing(df, COLS, impute_method)
@@ -207,7 +207,7 @@ class Dataset_Merger:
     df[COLS].isna().value_counts()
     return df
 
-  def preprocess_dates(self, df, date_col=None):
+  def preprocess_dates(self, df, date_col=None, date_fmt=None):
     """
     Does what create_std_date() does but also installs a Datetime index.
     Returns reworked df.
@@ -229,8 +229,11 @@ class Dataset_Merger:
           df[self.DATE_COL] = pd.to_datetime(df[date_col])
         except:
           self.debug ('Failure parsing dates - falling back to Python datestamps')
-          #TODO genericize
-          df[self.DATE_COL] = df[date_col].apply(lambda x: dt.strptime(x, '%d/%m/%Y'))
+          # parameterized - was '%d/%m/%Y' which is pretty safe as a default, because this is how
+          #   python dates serialize into CSV; so, groomed datasets will likely use this format
+          if (date_fmt is None):
+            date_fmt = '%d/%m/%Y'
+          df[self.DATE_COL] = df[date_col].apply(lambda x: dt.strptime(x, date_fmt))
 
     # Ensure DATE_COL and year/month/date cols
     df = self.create_std_date(df)
@@ -383,7 +386,7 @@ class Dataset_Merger:
 
     return df_retain(df, keep_cols)
 
-  def downscale(self, df, src_freq, columns=None):
+  def downscale(self, df, src_freq, columns=None, date_fmt=None):
     """
     Downscale the given dataset into the timesteps for this Merger.
     Requires input to already contain a std date column.
@@ -393,7 +396,7 @@ class Dataset_Merger:
     # Reference target
     df_ref = self.get_reference_df()
     # use preprocess b/c we only have an index
-    df_ref = self.preprocess_dates(df_ref)
+    df_ref = self.preprocess_dates(df_ref, date_fmt)
 
     if (df_ref.shape[0] > df.shape[0]):
       print(f'WARN: downscale found missing data in df vs. df_ref: {df.shape[0]} vs. {df_ref.shape[0]}')
@@ -461,7 +464,7 @@ class Dataset_Merger:
     # Remove unnecessary columns and return merged result
     return df_merge
 
-  def upscale(self, df, columns=None):
+  def upscale(self, df, columns=None, date_fmt=None):
     """
     Upscale the given dataset into the timesteps for this Merger.
     """
@@ -470,7 +473,7 @@ class Dataset_Merger:
     # Reference dest target
     df_ref = self.get_reference_df()
     # use preprocess b/c we only have an index
-    df_ref = self.preprocess_dates(df_ref)
+    df_ref = self.preprocess_dates(df_ref, date_fmt)
 
     if (df_ref.shape[0] < df.shape[0]):
       print(f'WARN: upscale found additional data in df vs. df_ref: {df.shape[0]} vs. {df_ref.shape[0]}\n  these may just be rows outside the merger timeframe')

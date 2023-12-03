@@ -10,42 +10,6 @@ Original file is located at
 
 Graph results of climate prediction data captured via CSV data.
 """
-
-## ------------------------------
-
-DRIVE_PATH = "/data/projects/climate-data-model/"
-
-# Set the location of this script in GDrive
-SCRIPT_PATH = DRIVE_PATH + "py-src/"
-
-# Location of run data
-JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
-DATA_ROOT = DRIVE_PATH + "data/preds/"
-
-## ###############################
-## Run parameters
-debug = False
-# Plot a certain result??  0 for all
-SHOW_SERIAL = 0   # set to 0 to show just the best
-# -- UNCOMMENT to load a particular result set --
-# DATA_ROOT = DRIVE_PATH + "data/preds-s11/"
-# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
-
-RMSE_THRESHOLD = 0.45
-## ###############################
-
-# Colors for rendering
-colors = 'rbygm'
-
-# Visualization params
-METRIC = 'RMSE'
-
-GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures','Scaler']
-TGT_LABEL = 0
-WIND_SIZE = 1
-TEST_PCT = 2
-COLS = 3
-
 import glob
 import os
 import pandas as pd
@@ -55,14 +19,41 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
+## ------------------------------
+DRIVE_PATH = "/data/projects/climate-data-model/"
+# Set the location of this script in GDrive
+SCRIPT_PATH = DRIVE_PATH + "py-src/"
+# Location of run data
+JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
+DATA_ROOT = DRIVE_PATH + "data/preds/"
+# Colors for rendering
+colors = 'rbygm'
+
+## ###############################
+## Run parameters
+debug = False
+# Plot a certain result??  0 for all
+SHOW_SERIAL = 0  # set to 0 to show just the best
+# -- UNCOMMENT to load a particular result set --
+DATA_ROOT = DRIVE_PATH + "data/preds-s21/"
+
+JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+RMSE_THRESHOLD = 0.25
+
+## ###############################
 # Attempt to offboard graphics to Qt5
 #import matplotlib
 #matplotlib.use('Qt5Agg')
 #from display_window import DispApp
 #disp = DispApp(fig)
 
+## ###############################
+# Visualization params
+METRIC = 'RMSE'
+
+GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures','Scaler']
 DATE_COL = 'pred_dates'
-TICK_SPACING=6
+TICK_SPACING = 6
 
 # Load CSV overall results
 df = pd.read_csv(JOURNAL_LOG)

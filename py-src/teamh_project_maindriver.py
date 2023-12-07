@@ -167,11 +167,12 @@ INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
 # ALPHAS = [1e-4,5e-4,5e-5]
-ALPHAS = [1e-4,5e-4]
+ALPHAS = [1e-3,5e-4]
 
 # Dynamically build a scaler from name
 # SCALERS = ['StandardScaler','PowerTransformer','QuantileTransformer','RobustScaler']
-SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
+# SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
+SCALERS = ['MinMaxScaler']
 #  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
 #    to reverse it you need to retain, and multiply by, w
   # w = np.sqrt(sum(x**2))
@@ -192,8 +193,8 @@ SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
 # 'Densev1',
 # MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
-# MODEL_NAMES = ['LSTMv3','LSTMv31','LSTMv32']
-MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
+MODEL_NAMES = ['LSTMv31']
+# MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
 
 
 # Start/stop including data from these dates

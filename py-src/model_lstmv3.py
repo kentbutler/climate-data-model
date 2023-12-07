@@ -28,7 +28,7 @@ class Model_LSTMv3(Base_Model):
     """
     early_stop = EarlyStopping(monitor = "loss", mode = "min", patience = 25)
     model = Sequential()
-    model.add(Conv1D(filters=256, kernel_size=2, activation='relu', input_shape=(self.WINDOW_SIZE, num_features)))
+    model.add(Conv1D(filters=256, kernel_size=2, activation='tanh', input_shape=(self.WINDOW_SIZE, num_features)))
     #model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
     #model.add(Flatten())
@@ -41,7 +41,7 @@ class Model_LSTMv3(Base_Model):
     #model.add(LSTM(units=100, return_sequences=True, activation='tanh'))
     #model.add(Bidirectional(LSTM(128, activation='tanh')))
     model.add(Flatten())
-    model.add(Dense(100, activation='relu'))
+    model.add(Dense(100, activation='tanh'))
     model.add(Flatten())
     model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
     if (self.LABEL_WINDOW > 1):

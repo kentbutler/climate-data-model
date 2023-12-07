@@ -24,6 +24,7 @@ class Model_LSTMv2(Base_Model):
     """
     Build and train the model.
     """
+    LSTM_SIZE=128
     early_stop = EarlyStopping(monitor = "loss", mode = "min", patience = 25)
     model = Sequential()
     model.add(Conv1D(filters=256, kernel_size=2, activation='relu', input_shape=(self.WINDOW_SIZE, num_features)))
@@ -31,14 +32,14 @@ class Model_LSTMv2(Base_Model):
     model.add(MaxPooling1D(pool_size=2))
     model.add(Flatten())
     model.add(RepeatVector(self.WINDOW_SIZE))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=LSTM_SIZE, return_sequences=True, activation='tanh'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
+    model.add(LSTM(units=LSTM_SIZE, return_sequences=True, activation='tanh'))
     model.add(Dropout(0.2))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
-    model.add(LSTM(units=100, return_sequences=True, activation='relu'))
-    model.add(Bidirectional(LSTM(128, activation='relu')))
-    model.add(Dense(100, activation='relu'))
+    model.add(LSTM(units=LSTM_SIZE, return_sequences=True, activation='tanh'))
+    model.add(LSTM(units=LSTM_SIZE, return_sequences=True, activation='tanh'))
+    model.add(Bidirectional(LSTM(128, activation='tanh')))
+    model.add(Dense(LSTM_SIZE, activation='relu'))
     model.add(Dense(self.NUM_LABELS*self.LABEL_WINDOW))
 
     if (self.LABEL_WINDOW > 1):

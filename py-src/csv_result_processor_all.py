@@ -32,13 +32,13 @@ colors = 'rbygm'
 ## ###############################
 ## Run parameters
 debug = False
+RMSE_THRESHOLD = 0.25
+
 # Plot a certain result??  0 for all
 SHOW_SERIAL = 0  # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-DATA_ROOT = DRIVE_PATH + "data/preds-s21/"
-
-JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
-RMSE_THRESHOLD = 0.25
+# DATA_ROOT = DRIVE_PATH + "data/preds-s21/"
+# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 ## ###############################
 # Attempt to offboard graphics to Qt5
@@ -50,10 +50,10 @@ RMSE_THRESHOLD = 0.25
 ## ###############################
 # Visualization params
 METRIC = 'RMSE'
-
 GROUP_COLS = ['TargetLabel','Model','InputWindow','LabelWindow','TestPct','Columns','NumFeatures','Scaler']
 DATE_COL = 'pred_dates'
 TICK_SPACING = 6
+LINEPLOT_MARKERS=[]  # ['o','v'] drops marks on each datapoint - can get cluttered
 
 # Load CSV overall results
 df = pd.read_csv(JOURNAL_LOG)
@@ -121,7 +121,7 @@ for i,s in enumerate(df.index.values):
   df_stats.set_index('pred_dates', drop=True, inplace=True)
   df_stats.rename(columns={'preds':'Predictions'},inplace=True)
   # Plot
-  sns.lineplot(data=df_stats, ax=ax, markers=['o','v'])
+  sns.lineplot(data=df_stats, ax=ax, markers=LINEPLOT_MARKERS)
   # Annotate
 
   ax.set_xticks(df_stats.index, labels=df_stats.index, rotation=90)

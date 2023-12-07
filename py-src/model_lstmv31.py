@@ -28,7 +28,7 @@ class Model_LSTMv31(Base_Model):
     """
     early_stop = EarlyStopping(monitor = "loss", mode = "min", patience = 25)
     model = Sequential()
-    model.add(Conv1D(filters=256, kernel_size=2, activation='relu', input_shape=(self.WINDOW_SIZE, num_features)))
+    model.add(Conv1D(filters=256, kernel_size=2, activation='tanh', input_shape=(self.WINDOW_SIZE, num_features)))
     #model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
     #model.add(Flatten())

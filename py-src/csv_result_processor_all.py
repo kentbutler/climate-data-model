@@ -19,7 +19,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
-## ------------------------------
+## ###############################
+## DO NOT MODIFY
 DRIVE_PATH = "/data/projects/climate-data-model/"
 # Set the location of this script in GDrive
 SCRIPT_PATH = DRIVE_PATH + "py-src/"
@@ -28,17 +29,17 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 DATA_ROOT = DRIVE_PATH + "data/preds/"
 # Colors for rendering
 colors = 'rbygm'
-
 ## ###############################
+
 ## Run parameters
 debug = False
-RMSE_THRESHOLD = 0.25
+RMSE_THRESHOLD = 0.2
 
 # Plot a certain result??  0 for all
-SHOW_SERIAL = 0  # set to 0 to show just the best
+SHOW_SERIAL = 922970  # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-# DATA_ROOT = DRIVE_PATH + "data/preds-s21/"
-# JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
+DATA_ROOT = DRIVE_PATH + "data/preds-s30/"
+JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 ## ###############################
 # Attempt to offboard graphics to Qt5
@@ -123,7 +124,6 @@ for i,s in enumerate(df.index.values):
   # Plot
   sns.lineplot(data=df_stats, ax=ax, markers=LINEPLOT_MARKERS)
   # Annotate
-
   ax.set_xticks(df_stats.index, labels=df_stats.index, rotation=90)
   ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
   plt.xlabel('Time steps')

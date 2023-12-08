@@ -35,17 +35,19 @@ NASA climate time machine: https://climate.nasa.gov/interactives/climate-time-ma
 
 Note: algorithm tuning is done with declaration of the model.
 """
-
+import math
+import csv
+import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 import datetime
-import numpy as np
-import math
 import importlib
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, RobustScaler, PowerTransformer, \
   QuantileTransformer, Normalizer
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_absolute_percentage_error
 from sklearn.pipeline import Pipeline
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -87,7 +89,7 @@ plt.style.use('seaborn')
 
 class ModelExecutor():
 
-  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, debug=False):
+  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, plot=False, debug=False):
     self.debug = debug
     self.DATA_PATH = data_path
     self.LOG_PATH = log_path
@@ -105,11 +107,11 @@ class ModelExecutor():
     self.MODEL_NAME = model_name
     self.SCALER_NAME = scaler
     self.ALPHA = alpha
+    self.PLOT = plot
 
     # Device to run on
     self.run_on_device =  'cpu' # 'cuda'
     # Other internal state
-    self.PLOT = False
     self.model_factory = None
     self.model = None
 
@@ -160,7 +162,7 @@ class ModelExecutor():
     df_corr = self.df_merge.corr()
 
     # Identify the columns which have medium to strong correlation with target
-    df_corr_cols = df_corr[df_corr[TARGET_LABEL] > 0.5]
+    df_corr_cols = df_corr[df_corr[self.TARGET_LABEL] > 0.5]
 
     # Drop the target from the correlation results in case we want to use this reduced set
     #    in place of the full set
@@ -193,6 +195,9 @@ class ModelExecutor():
   def train(self):
     return self.process()
 
+  def predict(self):
+    return self.process(predict=True)
+
   def load_model(self, model_fullpath):
     # Warning: defaulting num labels - currently supporting multi output labels is TBD
     mf = self.get_model_factory(num_labels=1)
@@ -203,190 +208,12 @@ class ModelExecutor():
     self.model = model
     return model
 
-  def predict(self):
-    # Now, set up last step of existing data
-    # and ensure we can predict past it - single shot
-    print(f'## Predicting {self.LABEL_WINDOW} steps ahead')
-    if (self.model is None):
-      raise AssertionError('Model is not loaded; please train or load a model first')
+  def process(self, predict=False):
 
-    # It's time to set date as index and remove from dataset
-    if (self.merger.DATE_COL in self.df_merge.columns):
-      self.df_merge.set_index(self.merger.DATE_COL, inplace=True, drop=True)
-
-    # Remove piecemeal date fields as well
-    self.df_merge.drop(columns=['day','month','year'], inplace=True)
-
-    NUM_FEATURES = len(self.df_merge.columns)
-    print(self.df_merge)
-
-    ## """** Extract just last section as input **"""
-
-    df_input = self.df_merge.iloc[-self.INPUT_WINDOW:, :]
-    # use existing y values to create a scaler we can use on results
-    y_train = df_input[self.TARGET_LABEL]
-
-    if self.debug:
-      print(f'df_input: {df_input.shape}')
-
-    ## """**Scale data**
-
-    # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
-
-    # Dynamically build a scaler from name
-    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
-    module = importlib.import_module('sklearn.preprocessing')
-    ScalerClass = getattr(module, self.SCALER_NAME)
-    num_scaler = ScalerClass()
-    label_scaler = ScalerClass()
-    print(f'## Scaler type: {type(num_scaler)}')
-
-    # Create small pipeline for numerical features
-    numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                        ('scale', num_scaler)])
-
-    # get names of numerical features
-    con_lst = df_input.select_dtypes(include='number').columns.to_list()
-
-    # Transformer for applying Pipelines
-    column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
-
-    # Transform data features
-    X_train_tx = column_transformer.fit_transform(df_input)
-
-    # Transform labels
-    y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
-
-    if self.debug:
-      print(f'X_train_tx:: {X_train_tx.shape}: {X_train_tx[0]}')
-      print(f'y_train_tx:: {y_train_tx.shape}: {y_train_tx[0]}')
-
-    ## """**Extract X**
-
-    # Normally we would do this by explicitly extracting data from our df.
-    # However for a time series, we're going to create many small supervised learning sets, so a set of X and y pairs.
-    # We should end up with data in a shape ready for batched network input:
-    # `batches X time_steps X features`
-    NUM_LABELS = 1
-
-    ## **Modeling**
-
-    # These are the features we are going to be modeling
-    COLS = list(self.df_merge.columns)
-
-    ## """**Slice into Batches**"""
-
-    # windower = TfWindowGenerator(input_width=self.INPUT_WINDOW,
-    #                             label_width=self.LABEL_WINDOW,
-    #                             shift=self.SHIFT,
-    #                             batch_size=self.INPUT_WINDOW,
-    #                             debug=False)
-    # print(windower)
-
-    # Build TF Dataset from arrays
-    # ds = windower.get_ds_from_arrays(X_train_tx, y_train_tx)
-
-    X_in = np.asarray(X_train_tx).astype('float32')
-
-    ## """**Prep GPU**"""
-
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-
-    ##"""**Build model**"""
-
-    #model = ModelLSTMv2(window_size=self.INPUT_WINDOW, num_epochs=self.NUM_EPOCHS, debug=True)
-
-    print(f'Using loaded model: {self.model.get_name()}')
-    model = self.model
-
-    ##"""**Train model**"""
-
-    #model.train(X, y, NUM_FEATURES)
-    print(f'## Prepping for predicting with input {X_in.shape}')
-    # Ensure we match original windowed model shape
-    X_in = X_in.reshape( -1, self.INPUT_WINDOW, X_in.shape[1])
-    print(f'## Predicting in model with windowed input {X_in.shape}')
-    batch_preds = model.predict(X_in)
-
-    print(f'## Preds rcvd: {batch_preds.shape}')
-    if (len(batch_preds.shape) > 2):
-      batch_preds = batch_preds.reshape(self.LABEL_WINDOW, -1)
-
-    # Re-Scale
-    preds = label_scaler.inverse_transform(batch_preds)
-
-    # Reduce to single array
-    preds = np.squeeze(preds)
-    print(f'## Preds: {preds.shape}')
-
-    ##"""**Determine time step calulator**"""
-
-    # Defaults to a single Day
-    STEP_OFFSET = pd.DateOffset()
-
-    if (self.STEP_FREQ == 'M'):
-      STEP_OFFSET = pd.DateOffset(months=1)
-    else:
-      STEP_OFFSET = pd.DateOffset(years=1)
-
-    ##"""**Show Predictions**"""
-
-    num_predictions = len(preds)
-    print(f'Num Exp. Predictions: {num_predictions}')
-
-    # Get date frame for injecting predicted results
-    # start step is data last step + 1
-    last_step = df_input.index[-1]
-    print(f'## Last data step: {last_step}')
-    first_pred = last_step + STEP_OFFSET
-    print(f'## First pred step: {first_pred}')
-    last_pred = first_pred
-    for i in range(num_predictions):
-      last_pred = last_pred + STEP_OFFSET
-    print(f'## Last pred step: {last_pred}')
-
-    df_results = create_timeindexed_df(first_pred, last_pred, self.STEP_FREQ)
-    df_results['preds'] = preds
-
-    # Combine input and preds
-    #TODO - how to show as different yet continuous marks
-    df_input = df_retain(df_input, self.TARGET_LABEL)
-    df_aggr = df_input.merge(df_results, how='outer', left_index=True,right_index=True, suffixes=[None,'net'])
-
-    print(df_aggr)
-
-    # Finally, we have to reduce to a simple index to make the graphing work nicely
-    df_aggr.reset_index(inplace=True, drop=False, names='pred_dates')
-    # But we need a date label col
-    date_labels = df_aggr['pred_dates'].apply(lambda x: x.strftime('%Y-%m-%d')).values
-    # and now we can drop it
-    df_aggr.drop(columns=['pred_dates'], inplace=True)
-
-    ##"""**Analyze results**"""
-
-    #print(df_results)
-
-    # Plot results - Y vs. Pred
-    TICK_SPACING=6
-    fig, ax = plt.subplots(figsize=(8,6), layout="constrained")
-    sns.lineplot(data=df_aggr, ax=ax)
-    ax.set_xticks(df_aggr.index, labels=date_labels, rotation=90)
-    ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
-    plt.xlabel('Time steps')
-    plt.ylabel('Temp in degrees C')
-    plt.legend(('Recent','Predicted'))
-    plt.title(f'Prediction of next {self.LABEL_WINDOW} {self.STEP_FREQ} Steps', fontsize=16)
-    plt.show()
-
-    # write pred results out
-    # df_results['pred_dates'] = date_labels
-    # df_results.to_csv(self.LOG_PATH + f'model-preds-{serial}.csv', index_label='index')
-
-    # Clear axis
-    ax.clear()
-
-
-  def process(self):
+    if (predict):
+      print(f'## Predicting {self.LABEL_WINDOW} steps ahead')
+      if (self.model is None):
+        raise AssertionError('Model is not loaded; please train or load a model first')
 
     # It's time to set date as index and remove from dataset
     if (self.merger.DATE_COL in self.df_merge.columns):
@@ -407,29 +234,32 @@ class ModelExecutor():
     NUM_TEST = math.floor(WORKING_ROWS * self.TEST_RATIO)
     NUM_TRAIN = WORKING_ROWS - NUM_TEST
 
-    print(f'Num features: {NUM_FEATURES}')
-    print(f'Total rows: {TOTAL_ROWS}')
-    print(f'Validation rows: {NUM_VALIDATION}')
-    print(f'Train rows: {NUM_TRAIN}')
-    print(f'Test rows: {NUM_TEST}')
+    print(f'\tNum features: {NUM_FEATURES}')
+    print(f'\tTotal rows: {TOTAL_ROWS}')
+    print(f'\tValidation rows: {NUM_VALIDATION}')
+    print(f'\tTrain rows: {NUM_TRAIN}')
+    print(f'\tTest rows: {NUM_TEST}')
 
     ## """**Split into Train/Test**"""
 
     df_train = self.df_merge.iloc[:NUM_TRAIN, :]
     if (self.VAL_RATIO > 0):
       df_val = self.df_merge.iloc[NUM_TRAIN:NUM_TRAIN+NUM_VALIDATION, :]
-    df_test = self.df_merge.iloc[NUM_TRAIN+NUM_VALIDATION:, :]
+    if (self.TEST_RATIO > 0):
+      df_test = self.df_merge.iloc[NUM_TRAIN+NUM_VALIDATION:, :]
 
     y_train = df_train[self.TARGET_LABEL]
     if (self.VAL_RATIO > 0):
       y_val = df_val[self.TARGET_LABEL]
-    y_test = df_test[self.TARGET_LABEL]
+    if (self.TEST_RATIO > 0):
+      y_test = df_test[self.TARGET_LABEL]
 
     if self.debug:
       print(f'df_train: {df_train.shape}')
       print(f'y_train: {y_train.shape}')
-      print(f'df_test: {df_test.shape}')
-      print(f'y_test: {y_test.shape}')
+      if (self.TEST_RATIO > 0):
+        print(f'df_test: {df_test.shape}')
+        print(f'y_test: {y_test.shape}')
       if (self.VAL_RATIO > 0):
         print(f'df_val: {df_val.shape}')
         print(f'y_val: {y_val.shape}')
@@ -440,7 +270,7 @@ class ModelExecutor():
     # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
 
     # Dynamically build a scaler from name
-    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
+    #   TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
     module = importlib.import_module('sklearn.preprocessing')
     ScalerClass = getattr(module, self.SCALER_NAME)
     num_scaler = ScalerClass()
@@ -459,7 +289,8 @@ class ModelExecutor():
 
     # Transform data features
     X_train_tx = column_transformer.fit_transform(df_train)
-    X_test_tx = column_transformer.transform(df_test)
+    if (self.TEST_RATIO > 0):
+      X_test_tx = column_transformer.transform(df_test)
     if (self.VAL_RATIO > 0):
       X_val_tx = column_transformer.transform(df_val)
     #X_train_tx.shape, X_test_tx.shape, X_val_tx.shape
@@ -475,15 +306,13 @@ class ModelExecutor():
       print(f'X_train_tx {X_train_tx.shape}: {X_train_tx[0]}')
       print(f'y_train_tx {y_train_tx.shape}: {y_train_tx[0]}')
 
-    ## """**Extract X and y**
+    ## """**Extract Params**
 
     # Normally we would do this by explicitly extracting data from our df.
     # However for a time series, we're going to create many small supervised learning sets, so a set of X and y pairs.
     # We should end up with data in a shape ready for batched network input:
     # `batches X time_steps X features`
     NUM_LABELS = y_train_tx.shape[1]
-
-    ## **Modeling**
 
     # These are the features we are going to be modeling
     COLS = list(self.df_merge.columns)
@@ -504,34 +333,38 @@ class ModelExecutor():
 
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
-    ##"""**Build model**"""
+    if (predict):
+      model = self.model
+    else:
+      # Use model factory for flexible selection
+      mf = self.get_model_factory(NUM_LABELS)
+      print(f'{mf}\nInitializing model: {self.MODEL_NAME}')
+      model = mf.get(self.MODEL_NAME)
 
-    #model = ModelLSTMv2(window_size=self.INPUT_WINDOW, num_epochs=self.NUM_EPOCHS, debug=True)
+    # If we are predicting, we won't get a number for this since it happens in training
+    #   use a default value so we can exclude this from output in this case
+    num_epochs = 0
 
-    # Use factory for flexible selection
-    mf = self.get_model_factory(NUM_LABELS)
-    print (mf)
+    # ** Prediction and Training ** #
 
-    print(f'Initializing model: {self.MODEL_NAME}')
-    model = mf.get(self.MODEL_NAME)
+    if (predict):
+      # Set up for running predictions on all data
+      # num_predictions = max(y_train.shape[0]-self.INPUT_WINDOW-self.LABEL_WINDOW, 1)
+      num_predictions = 1
 
-    ##"""**Train model**"""
-
-    #model.train(X, y, NUM_FEATURES)
-    print(f'## Training model with {NUM_FEATURES} features and {NUM_LABELS} labels')
-    model_history = model.train(dataset=ds, num_features=NUM_FEATURES)
-
-    # Capture stat
-    num_epochs = len(model_history.history['loss'])
-
-    ##"""**Test Predictions**"""
-
-    num_predictions = max(y_test.shape[0]-self.INPUT_WINDOW-self.LABEL_WINDOW, 1)
-    print(f'Num Exp. Predictions: {num_predictions} == {y_test.shape[0]}-{self.INPUT_WINDOW}-{self.LABEL_WINDOW}')
+    else:
+      ##"""**Train model**"""
+      print(f'## Training model with {NUM_FEATURES} features and {NUM_LABELS} labels')
+      model_history = model.train(dataset=ds, num_features=NUM_FEATURES)
+      # Capture stat
+      num_epochs = len(model_history.history['loss'])
+      # Set up for running test data
+      num_predictions = max(y_test.shape[0]-self.INPUT_WINDOW-self.LABEL_WINDOW, 1)
+      print(f'Num Exp. Predictions: {num_predictions} == {y_test.shape[0]}-{self.INPUT_WINDOW}-{self.LABEL_WINDOW}')
 
     preds = []
     pred_dates = []
-    y_test_vals = []
+    # y_vals = []
 
     # Defaults to a single Day
     STEP_OFFSET = pd.DateOffset()
@@ -541,20 +374,30 @@ class ModelExecutor():
     else:
       STEP_OFFSET = pd.DateOffset(years=1)
 
+    # Point to correct set of input data depending if we are training or predicting
+    if (predict):
+      X_input = X_train_tx
+      df_input = df_train
+    else:
+      X_input = X_test_tx
+      df_input = df_test
+
+    #TODO rework to pre-calculate each frame [START:STOP] before loop invocation
+    #  this way it can vary based on predict/train
+    next_start_index = 0
     for p in range(num_predictions):
       # Prepare inputs
-      #print(f'Pred range: x_test_tx[{p}:{p+self.INPUT_WINDOW}]')
-      X_pred = X_test_tx[p:p+self.INPUT_WINDOW,:].reshape(-1, self.INPUT_WINDOW, NUM_FEATURES)
+      X_pred = X_input[p:p+self.INPUT_WINDOW,:].reshape(-1, self.INPUT_WINDOW, NUM_FEATURES)
 
-      # Prepare outputs
+      # Prepare outputs - label is the answer at the NEXT position
+      #   so it should be an index ahead of the end of the input; hence, no -1 here
       label_start_index = p+self.INPUT_WINDOW
-      #print(f'Exp output: y_test[{label_start_index}:{label_start_index + self.LABEL_WINDOW}]')
-      y_test_vals.append(y_test[label_start_index:label_start_index + self.LABEL_WINDOW])
+      # y_vals.append(y_test[label_start_index:label_start_index + self.LABEL_WINDOW])
 
       if (self.LABEL_WINDOW == 1):
-        print(f'Pred date: {df_test.index[label_start_index]}')
+        print(f'Pred date: {df_input.index[label_start_index]}')
       else:
-        print(f'Pred dates: {df_test.index[label_start_index]} + {self.LABEL_WINDOW-1} steps')
+        print(f'Pred dates: {df_input.index[label_start_index]} + {self.LABEL_WINDOW-1} steps')
 
       # Predict
       batch_preds = model.predict(X_pred)
@@ -570,10 +413,10 @@ class ModelExecutor():
 
       if (self.LABEL_WINDOW == 1):
         preds.append(pred_vals.ravel())
-        pred_dates.append(df_test.index[label_start_index])
+        pred_dates.append(df_input.index[label_start_index])
       else:
         # Add one row per label output; we need to increment the date manually
-        pred_start_date = df_test.index[label_start_index]
+        pred_start_date = df_input.index[label_start_index]
         step_date = pred_start_date
         for val in pred_vals.tolist():
           # add current result values
@@ -600,8 +443,8 @@ class ModelExecutor():
     if ('pred_dates' in df_results.columns):
       df_results.set_index('pred_dates', drop=True, inplace=True)
 
-    # Reduce df_test to just the columns and dates necessary
-    df_y = df_retain(df_test, self.TARGET_LABELS)
+    # Reduce df_input to just the columns and dates necessary
+    df_y = df_retain(df_input, self.TARGET_LABELS)
     df_y = df_y[df_results.index.min():df_results.index.max()]
 
     # And merge y values into preds
@@ -616,64 +459,101 @@ class ModelExecutor():
     df_results.drop(columns=['pred_dates'], inplace=True)
 
     ##"""**Analyze results**"""
-
-    from sklearn.metrics import mean_squared_error, mean_absolute_error
-    from sklearn.metrics import mean_absolute_percentage_error
-    import csv
-
     # Timestamp for result set
     serial = self.current_time_ms()
 
-    # Save model
-    model.save_model(self.LOG_PATH, serial)
+    if (not predict):
+      # Save model
+      model.save_model(self.LOG_PATH, serial)
 
     print(df_results)
 
-    # Plot results - Y vs. Pred
-    TICK_SPACING=6
-    fig, ax = plt.subplots(figsize=(8,6), layout="constrained")
-    sns.lineplot(data=df_results, ax=ax)
-    ax.set_xticks(df_results.index, labels=date_labels, rotation=90)
-    ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
-    plt.xlabel('Time steps')
-    plt.ylabel('Temp in degrees C')
-    plt.legend(('Test','Predicted'))
-
-    # write pred results out
-    df_results['pred_dates'] = date_labels
-    df_results.to_csv(self.LOG_PATH + f'model-preds-{serial}.csv', index_label='index')
-
-    # Clear axis
-    ax.clear()
-
     ## """**Error Calculations**"""
-
-    y_test_vals = df_results['y_test'].values
+    y_vals = df_results['y_test'].values
     preds = df_results['preds'].values
 
     # Calculate MAPE
     m = tf.keras.metrics.MeanAbsolutePercentageError()
     try:
-      m.update_state(y_test_vals, preds)
+      m.update_state(y_vals, preds)
     except ValueError as ve:
       print(f'ValueError calculating MAPE: {ve}')
 
-    mse = mean_squared_error(y_test_vals, preds)
+    mse = mean_squared_error(y_vals, preds)
     rmse = np.sqrt(mse) if (mse > 0) else 0
-    mae = mean_absolute_error(y_test_vals, preds)
+    mae = mean_absolute_error(y_vals, preds)
     mape = m.result().numpy()/100  # adjust Keras output to match scikit
-    sk_mape = mean_absolute_percentage_error(y_test_vals, preds)
+    sk_mape = mean_absolute_percentage_error(y_vals, preds)
 
     print(f'MSE: {mse}')
     print(f'MAE: {mae}')
     print(f'MAPE: {mape}')
     print(f'SKMAPE: {sk_mape}')
 
-    ## """**Journal entry**"""
-    with open(self.JOURNAL_LOG, 'a') as csvfile:
-      writer = csv.writer(csvfile)
-      #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','RMSE','MSE','MAE','MAPE','SKMAPE','Columns'])
-      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,rmse,mse,mae,mape,sk_mape,COLS])
+    # Visualization params
+    METRIC = 'RMSE'
+    GROUP_COLS = ['TargetLabel', 'Model', 'InputWindow', 'LabelWindow', 'TestPct', 'Columns', 'NumFeatures', 'Scaler']
+    DATE_COL = 'pred_dates'
+    TICK_SPACING = 6
+    LINEPLOT_MARKERS = []  # ['o','v'] drops marks on each datapoint - can get cluttered
+    col_font = 8
+    if (len(COLS) > 144):
+      # about the length of a 11-inch diag; if so, make columns font smaller
+      col_font = 6
+
+    # Condition
+    df_results.set_index(date_labels, inplace=True)
+    df_results.rename(columns={'preds': 'Predictions'}, inplace=True)
+
+    if (self.PLOT):
+      # Plot
+      fig, ax = plt.subplots(1, 1, figsize=(11, 6), layout="constrained")
+      sns.lineplot(data=df_results, ax=ax, markers=LINEPLOT_MARKERS)
+      # Annotate
+      ax.set_xticks(df_results.index, labels=df_results.index, rotation=90)
+      ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
+      plt.xlabel('Time steps')
+      plt.ylabel('Temp in degrees C')
+      title_str = f'In/Out Windows: {self.INPUT_WINDOW}/{self.LABEL_WINDOW}   Model: {self.MODEL_NAME}\n\n'
+      ax.set_title(f'{self.LABEL_WINDOW} {self.STEP_FREQ} Prediction\n{title_str}')
+      sub_clause=""
+      if (num_epochs > 0):
+        sub_clause = f' Epochs: {num_epochs}'
+      ax.annotate(f'RMSE: {rmse}  MAE: {mae}{sub_clause} Scaler: {self.SCALER_NAME}            ',
+                  xy=(1, 1),  # point to annotate - see xycoords for units
+                  xytext=(50, 25),  # offset from xy - units in textcoords
+                  xycoords='axes fraction',  # how coords are translated?
+                  textcoords='offset pixels',  # 'axes fraction', 'offset pixels'
+                  horizontalalignment='right'
+                  )
+      ax.annotate(COLS,
+                  xy=(1, 1),  # point to annotate - see xycoords for units
+                  xytext=(50, 10),  # offset from xy - units in textcoords
+                  xycoords='axes fraction',  # how coords are translated?
+                  textcoords='offset pixels',  # 'axes fraction', 'offset pixels'
+                  horizontalalignment='right'
+                  )
+      ax.texts[0].set_size(10)
+      ax.texts[1].set_size(col_font)
+      plt.show()
+
+    if (not predict):
+      # write pred results out
+      # drop previous index - we want the dates as a column
+      df_results.reset_index(inplace=True, drop=True)
+      df_results['pred_dates'] = date_labels
+      df_results.to_csv(self.LOG_PATH + f'model-preds-{serial}.csv', index_label='index')
+
+    if (self.PLOT):
+      # Clear axis
+      ax.clear()
+
+    if (not predict):
+      ## """**Journal entry**"""
+      with open(self.JOURNAL_LOG, 'a') as csvfile:
+        writer = csv.writer(csvfile)
+        #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','RMSE','MSE','MAE','MAPE','SKMAPE','Columns'])
+        writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,rmse,mse,mae,mape,sk_mape,COLS])
 
     return serial
 

@@ -73,8 +73,6 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 
 """**Dataset Definitions**"""
 
-# Label to predict
-TARGET_LABEL = 'airPrefAvgTemp'
 
 # Datasets
 TEMP_DATA = {'filename':'GlobalTemperatures.csv',
@@ -132,11 +130,6 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
                'feature_map':{'EventRating':'policy_rating'},
                'date_col':'date'}
 
-
-#GHG_DATA = {'filename':'greenhouse_gas_inventory_data.csv',
-#            'feature_map':{''},
-#            'date_map':{'Year':'year'}}
-
 """**Run Parameters**"""
 
 debug = False
@@ -163,16 +156,16 @@ NUM_EPOCHS = 300
 # History lookback in network
 #INPUT_WINDOWS = [30,48,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [60]
+INPUT_WINDOWS = [84]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
 # ALPHAS = [1e-4,5e-4,5e-5]
-ALPHAS = [1e-3,5e-4]
+ALPHAS = [1e-4,5e-4]
 
 # Dynamically build a scaler from name
 # SCALERS = ['StandardScaler','PowerTransformer','QuantileTransformer','RobustScaler']
-# SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
-SCALERS = ['MinMaxScaler']
+SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
+# SCALERS = ['MinMaxScaler']
 #  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
 #    to reverse it you need to retain, and multiply by, w
   # w = np.sqrt(sum(x**2))
@@ -193,26 +186,33 @@ SCALERS = ['MinMaxScaler']
 # 'Densev1',
 # MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
-MODEL_NAMES = ['LSTMv31']
-# MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
+# MODEL_NAMES = ['LSTMv31']
+MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
 
 
 # Start/stop including data from these dates
-# START_DATE =  pd.to_datetime('1950-01-01')
+# UC1 - global temp pred
+START_DATE =  pd.to_datetime('1950-01-01')
+END_DATE = pd.to_datetime('2015-12-01')
+# UC2 - historical model
+# START_DATE =  pd.to_datetime('1850-01-01')
 # END_DATE = pd.to_datetime('2023-10-01')
-START_DATE =  pd.to_datetime('1850-01-01')
-END_DATE = pd.to_datetime('2023-10-01')
 
 # Base everything on this dataset
-INITIAL_DATASET = AIR_TEMP_DATA
+INITIAL_DATASET = TEMP_DATA     #UC1
+# INITIAL_DATASET = AIR_TEMP_DATA  #UC2
+
+# Label to predict
+TARGET_LABEL = 'landSeaAvgTemp'  #UC1
+# TARGET_LABEL = 'airPrefAvgTemp' #UC2
 
 # Use case 1
-# ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
+ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]]
 
 # Use case 2
 # ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
 #               [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
-ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
+# ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
 
 # ALL_DATASETS = [
 #   [AIR_TEMP_DATA],

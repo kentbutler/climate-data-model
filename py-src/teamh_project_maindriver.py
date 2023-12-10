@@ -51,7 +51,7 @@ import math
 import importlib
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
-plt.rcParams["figure.figsize"] = (10,6)
+# plt.rcParams["figure.figsize"] = (10,6)
 import warnings
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn')
@@ -156,7 +156,7 @@ NUM_EPOCHS = 300
 # History lookback in network
 #INPUT_WINDOWS = [30,48,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [84]
+INPUT_WINDOWS = [60]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
 # ALPHAS = [1e-4,5e-4,5e-5]
@@ -253,6 +253,6 @@ for n in range(NUM_LOOPS):
 
               exec.load_datasets(ds_list)
               #exec.print_correlations()
-              exec.process()
+              exec.train()
 
   print(f'=========================== Completed {i+j+k+m+n+z} ===================================')

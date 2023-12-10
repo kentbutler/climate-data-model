@@ -87,7 +87,20 @@ plt.style.use('seaborn')
 
 class ModelExecutor():
 
-  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, debug=False):
+  # Count of time steps a the given scale that constitute a typical full cycle in the data
+  #   Easy example is years
+  CYCLE_LENGTH = {
+    'Y': 1,
+    'M': 12,
+    'D': 365
+  }
+  FREQ_LABELS = {
+    'D':'Day',
+    'M':'Month',
+    'Y':'Year'
+  }
+
+  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, plot=False, debug=False):
     self.debug = debug
     self.DATA_PATH = data_path
     self.LOG_PATH = log_path
@@ -105,19 +118,21 @@ class ModelExecutor():
     self.MODEL_NAME = model_name
     self.SCALER_NAME = scaler
     self.ALPHA = alpha
+    self.PLOT = plot
 
     # Device to run on
     self.run_on_device =  'cpu' # 'cuda'
     # Other internal state
-    self.PLOT = False
+    self.plot_ds = False
     self.model_factory = None
     self.model = None
+    self.column_transformer = None
 
   def load_initial_dataset(self, ds_name, feature_map, date_map=None, date_col=None):
     # Declare a merger compatible with our source data and our target dataset we want to merge into
     self.merger = Dataset_Merger(data_path=self.DATA_PATH,
                             start_date=self.START_DATE, end_date=self.END_DATE,
-                            plot=self.PLOT, debug=self.debug)
+                            plot=self.plot_ds, debug=self.debug)
 
     # Start by merging initial dataset
     if (date_map is not None):
@@ -160,7 +175,7 @@ class ModelExecutor():
     df_corr = self.df_merge.corr()
 
     # Identify the columns which have medium to strong correlation with target
-    df_corr_cols = df_corr[df_corr[TARGET_LABEL] > 0.5]
+    df_corr_cols = df_corr[df_corr[self.TARGET_LABEL] > 0.5]
 
     # Drop the target from the correlation results in case we want to use this reduced set
     #    in place of the full set
@@ -190,12 +205,12 @@ class ModelExecutor():
     """
     return dt.now().microsecond
 
-  def train(self):
-    return self.process()
-
-  def load_model(self, model_fullpath):
+  def load_model(self, path, filename):
     # Warning: defaulting num labels - currently supporting multi output labels is TBD
     mf = self.get_model_factory(num_labels=1)
+    model_fullpath = f'{path}{"" if path[-1]=="/" else "/"}{filename}'
+    # Save model name for later graphing
+    self.MODEL_FILENAME = filename
     print(f"## Loading model: {model_fullpath}")
     model = mf.get_saved(model_fullpath)
     print(f'Model type: {type(model)}')
@@ -203,157 +218,285 @@ class ModelExecutor():
     self.model = model
     return model
 
-  def predict(self):
-    # Now, set up last step of existing data
-    # and ensure we can predict past it - single shot
+  def get_step_offset(self):
+    """
+    Converts self's STEP_FREQ, which is D/M/Y, into a pd DateOffset object
+    useful for date calculations.
+    :return: pd.DateOffset
+    """
+    # Defaults to a single Day
+    offset = pd.DateOffset()
+    if (self.STEP_FREQ == 'M'):
+      offset = pd.DateOffset(months=1)
+    elif (self.STEP_FREQ == 'Y'):
+      offset = pd.DateOffset(years=1)
+
+    return offset
+
+  def init_date_cols(self, df):
+
+    if (self.merger.DATE_COL in df.columns):
+      # Move date into index
+      df.set_index(self.merger.DATE_COL, inplace=True, drop=True)
+      # df.rename(columns={self.merger.DATE_COL:'pred_dates'}, inplace=True)
+
+    df.drop(columns=['day','month','year'], inplace=True)
+
+
+  def predict(self, num_label_windows=1):
+
     print(f'## Predicting {self.LABEL_WINDOW} steps ahead')
     if (self.model is None):
       raise AssertionError('Model is not loaded; please train or load a model first')
 
-    # It's time to set date as index and remove from dataset
-    if (self.merger.DATE_COL in self.df_merge.columns):
-      self.df_merge.set_index(self.merger.DATE_COL, inplace=True, drop=True)
+    # --- Trim dataset ---
+    # We only need enough data to allow for:
+    #     N label windows from the end PLUS enough space for the input window,
+    #        where N is the number of windows to predict
+    df_input = self.df_merge
 
-    # Remove piecemeal date fields as well
-    self.df_merge.drop(columns=['day','month','year'], inplace=True)
+    # Ensure inputs are sort chronologically, to ensure the index math
+    df_input.sort_index(inplace=True)
 
-    NUM_FEATURES = len(self.df_merge.columns)
-    print(self.df_merge)
+    # Before we truncate the data, let's get some summary info for later output
+    df_input['decade'] = [round(yr, -1) for yr in df_input['year']]
+    # df_decades = df_input.groupby(['decade'])[self.TARGET_LABEL].agg(['mean'])
+    df_decades = df_retain(df_input, ['decade',self.TARGET_LABEL])
+    # Ensure we don't lose this data
+    df_decades = df_decades.copy()
+    df_input.drop(columns=['decade'], inplace=True)
 
-    ## """** Extract just last section as input **"""
+    # Start of input data block
+    start_idx = df_input.shape[0] - ((num_label_windows * self.LABEL_WINDOW) + self.INPUT_WINDOW)
+    # ...and, just truncate from here
+    df_input = df_input.iloc[start_idx: , :]
 
-    df_input = self.df_merge.iloc[-self.INPUT_WINDOW:, :]
-    # use existing y values to create a scaler we can use on results
-    y_train = df_input[self.TARGET_LABEL]
+    # ...and, that resets our starting point - avoid confusion and mistakes
+    start_idx = 0
+
+    # first label start position, so we know how to extract our Y values
+    label_start_idx = start_idx + self.INPUT_WINDOW
+
+    self.init_date_cols(df_input)
+
+    # How we will count between timesteps
+    STEP_OFFSET = self.get_step_offset()
+
+    # --- Get stats ---
+
+    # how many actual values will we predict that we'll have Y data for
+    num_labels = (num_label_windows * self.LABEL_WINDOW)
+    # we're predicting num_label_windows AFTER end of dataset; add the SAME amount BEFORE end of dataset;
+    #    this allows for a balanced output graph (visual)
+    num_predictions = num_label_windows * 2
+    num_features = len(df_input.columns)
+
+    print(f"## df_input:\n{df_input}")
+
+    if (label_start_idx >= df_input.shape[0]):
+      # we are predicting past the end of the known data -- set start date as first step beyond!!
+      pred_start_date = (df_input.index[-1] + STEP_OFFSET)
+    else:
+      # pull first prediction start date from data
+      pred_start_date = df_input.index[label_start_idx]
+
+    print(f'### start_idx: {start_idx}')
+    print(f'### label_start_idx: {label_start_idx}')
+    print(f'### pred_start_date: {pred_start_date}')
+    print(f'### num_predictions: {num_predictions}')
+
+    # save these starting points
+    first_label_date = pred_start_date
+    first_label_index= label_start_idx
+    last_input_date = df_input.index[-1]
+
+    ## --- Scale ---
+    y_vals = df_input[self.TARGET_LABEL]
+    X_tx, y_tx = self.scale(df_input, y_vals)
+
+    #NUM_LABELS = 1
+    NUM_LABELS = y_tx.shape[1]
+    COLS = list(df_input.columns)
 
     if self.debug:
-      print(f'df_input: {df_input.shape}')
+      print(f'Num features: {len(COLS)}')
+      print(f'Num labels: {NUM_LABELS}')
+      print(f'X_tx:: {X_tx.shape}: {X_tx[0]}')
+      print(f'y_tx:: {y_tx.shape}: {y_tx[0]}')
 
-    ## """**Scale data**
-
-    # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
-
-    # Dynamically build a scaler from name
-    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
-    module = importlib.import_module('sklearn.preprocessing')
-    ScalerClass = getattr(module, self.SCALER_NAME)
-    num_scaler = ScalerClass()
-    label_scaler = ScalerClass()
-    print(f'## Scaler type: {type(num_scaler)}')
-
-    # Create small pipeline for numerical features
-    numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                        ('scale', num_scaler)])
-
-    # get names of numerical features
-    con_lst = df_input.select_dtypes(include='number').columns.to_list()
-
-    # Transformer for applying Pipelines
-    column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
-
-    # Transform data features
-    X_train_tx = column_transformer.fit_transform(df_input)
-
-    # Transform labels
-    y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
-
-    if self.debug:
-      print(f'X_train_tx:: {X_train_tx.shape}: {X_train_tx[0]}')
-      print(f'y_train_tx:: {y_train_tx.shape}: {y_train_tx[0]}')
-
-    ## """**Extract X**
-
-    # Normally we would do this by explicitly extracting data from our df.
-    # However for a time series, we're going to create many small supervised learning sets, so a set of X and y pairs.
-    # We should end up with data in a shape ready for batched network input:
-    # `batches X time_steps X features`
-    NUM_LABELS = 1
-
-    ## **Modeling**
-
-    # These are the features we are going to be modeling
-    COLS = list(self.df_merge.columns)
-
-    ## """**Slice into Batches**"""
-
-    # windower = TfWindowGenerator(input_width=self.INPUT_WINDOW,
-    #                             label_width=self.LABEL_WINDOW,
-    #                             shift=self.SHIFT,
-    #                             batch_size=self.INPUT_WINDOW,
-    #                             debug=False)
-    # print(windower)
-
-    # Build TF Dataset from arrays
-    # ds = windower.get_ds_from_arrays(X_train_tx, y_train_tx)
-
-    X_in = np.asarray(X_train_tx).astype('float32')
-
-    ## """**Prep GPU**"""
-
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-
-    ##"""**Build model**"""
-
-    #model = ModelLSTMv2(window_size=self.INPUT_WINDOW, num_epochs=self.NUM_EPOCHS, debug=True)
-
+    # --- Prepare to Run Model ---
     print(f'Using loaded model: {self.model.get_name()}')
     model = self.model
 
-    ##"""**Train model**"""
+    # Extract X input values as np array
+    X_input = np.asarray(X_tx).astype('float32')
+    # last index of X -- beyond this is just speculation
+    last_data_idx = len(X_input) - 1
 
-    #model.train(X, y, NUM_FEATURES)
-    print(f'## Prepping for predicting with input {X_in.shape}')
-    # Ensure we match original windowed model shape
-    X_in = X_in.reshape( -1, self.INPUT_WINDOW, X_in.shape[1])
-    print(f'## Predicting in model with windowed input {X_in.shape}')
-    batch_preds = model.predict(X_in)
+    # --- Predict ---
 
-    print(f'## Preds rcvd: {batch_preds.shape}')
-    if (len(batch_preds.shape) > 2):
-      batch_preds = batch_preds.reshape(self.LABEL_WINDOW, -1)
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+    print(f'## Begin predicting X_input: {X_input.shape}')
+    all_preds = []
 
-    # Re-Scale
-    preds = label_scaler.inverse_transform(batch_preds)
+    for p in range(num_predictions):
+      preds = []
+      pred_dates = []
+      # --- Boundary checks ---
+      # 1. Does our block end align w/ the end of the dataset?  If it goes over, we've done something wrong.
+      if ((start_idx+self.INPUT_WINDOW - 1) > last_data_idx):
+        # Some portion of the prediction output is beyond the "have data" line
+        #   set flag so we know that we are in prediction-only space!  from here we need to start rolling
+        #   the data back into X_input - i.e, autoregressing
+        print(f'WARN: Input block out of alignment - ending on: {start_idx+self.INPUT_WINDOW} when last idx is {last_data_idx}')
 
-    # Reduce to single array
-    preds = np.squeeze(preds)
-    print(f'## Preds: {preds.shape}')
+      # Extract just the input block we need for this iteration
+      #   NOTE that if we are autoregressing, we should have the data we need available from the previous iter
+      print(f'## Slicing X_input: {start_idx}:{start_idx+self.INPUT_WINDOW}')
+      X_pred = X_input[start_idx:start_idx+self.INPUT_WINDOW,:].reshape(-1, self.INPUT_WINDOW, num_features)
 
-    ##"""**Determine time step calulator**"""
+      print(f'### X_pred: {X_pred.shape}')
+      # print(f'### X_pred: {X_pred.shape}\n{X_pred}')
 
-    # Defaults to a single Day
-    STEP_OFFSET = pd.DateOffset()
+      # Predict
+      batch_preds = model.predict(X_pred)
+      print(f'## batch_preds: {batch_preds.shape}')
+      if (len(batch_preds.shape) > 2):
+        batch_preds = batch_preds.reshape(self.LABEL_WINDOW, -1)
+        print(f'## batch_preds reshaped: {batch_preds.shape}')
 
-    if (self.STEP_FREQ == 'M'):
-      STEP_OFFSET = pd.DateOffset(months=1)
-    else:
-      STEP_OFFSET = pd.DateOffset(years=1)
+      # Re-Scale
+      pred_vals = self.label_scaler.inverse_transform(batch_preds)
+      # Reduce to single array
+      pred_vals = np.squeeze(pred_vals)
+      # print(f'## pred_vals: {pred_vals.shape}  type: {type(pred_vals)}')
+
+      if (self.LABEL_WINDOW == 1):
+        preds.append(pred_vals.ravel())
+        all_preds.append(pred_vals.ravel())
+        pred_dates.append(pred_start_date)
+        pred_start_date = pred_start_date + STEP_OFFSET
+        print(f'### NEXT pred_start_date: {pred_start_date}')
+      else:
+        # Add one row per label output; we need to increment the date manually
+        for val in pred_vals.tolist():
+          # add current result values
+          print(f'## pred value: {val}')
+          preds.append(val)
+          all_preds.append(val)
+          pred_dates.append(pred_start_date)
+          print(f'## ADDING pred_start_date: {pred_start_date}')
+          # capture last recorded prediction date
+          last_label_date = pred_start_date
+          # move to next step
+          pred_start_date = (pred_start_date + STEP_OFFSET)
+
+      # input shifts forward same as label windows...because, we want our label windows to be contiguous
+      start_idx = start_idx + self.LABEL_WINDOW
+      # starting from PREVIOUS label window start....just move forward another label window
+      label_start_idx = label_start_idx + self.LABEL_WINDOW
+      print(f'## NEXT start_idx: {start_idx}')
+      print(f'## NEXT label_start_idx: {label_start_idx}')
+      print(f'## last_data_idx: {last_data_idx}')
+
+      # If any portion of the INPUT block is over the line, we're auto-regressing
+      #    Need to add some input data for the next iteration
+      print(f'## IS {start_idx} + {self.INPUT_WINDOW} - 1 ({start_idx + self.INPUT_WINDOW - 1}) > {last_data_idx}')
+      if ((start_idx + self.INPUT_WINDOW - 1) > last_data_idx):
+        # Capture predicted values as input to the next iteration
+        #   NOTE!!! We shouldn't have to do this -- we should be predicting ALL FEATURES
+        # ISSUE: what about all the other parameters??  if we're not predicting those....
+        # SOL: since right now we're not predicting multiple labels....
+        #    WORKAROUND - just replicate last known datapoints, and lay prediction in aside of those
+        #           use STEP_FREQ to find a suitable input window
+        #           want start to be same
+        if (pred_vals.shape[-1] != X_pred.shape[-1]):
+          # features input != features predicted
+          #   we need to fake it - copy all input features to output (but NOT THE SAME SIZE)
+          #    roll the prediction start_date back to align with the new start index
+          # we really need to predict from the INPUT side of things - so go back before the label window
+          missing_date_start = cur_step = pred_start_date - (self.INPUT_WINDOW * STEP_OFFSET)
+          cur_start_idx = start_idx
+          found = False
+          print(f'Going back in time to find data aligned with: {cur_step}')
+          while (not found):
+            # only need to satisfy the condition that there be enough data for INPUTS; no need for LABEL space
+            #    we're just going to copy the data into X_input
+            cur_step = cur_step - (self.CYCLE_LENGTH[self.STEP_FREQ] * STEP_OFFSET)
+            print(f'Trying step: {cur_step}')
+            cur_start_idx = cur_start_idx - self.CYCLE_LENGTH[self.STEP_FREQ]
+            if ((cur_start_idx + self.INPUT_WINDOW) <= last_data_idx):
+              found = True
+
+          # print(f'## df_input:\n{df_input}')
+          # print(f'## X_extract: {X_extract.shape}')
+          #TODO this won't work when INPUT_SIZE <> LABEL_SIZE
+          #    in that case we have to overwrite at the END of the block
+          end_step = cur_step + ((self.INPUT_WINDOW-1) * STEP_OFFSET)
+          print(f'Pulling data from {cur_step} to {end_step}')
+          df_extract = df_input.loc[cur_step:end_step]
+          print(f'## df_extract: {df_extract.shape}')
+          print(f'## df_extract last: {df_extract.index[-1]}')
+
+          # if the actual last_data_idx splits the actual input data block - i.e. data exists ONLY up to a point -
+          #   then, ensure we don't overwrite the real data in our extract by lopping the overlap off
+          if ((start_idx < last_data_idx) and (label_start_idx > (last_data_idx+1))):
+            df_extract = df_extract.iloc[(last_data_idx-start_idx):]
+            print(f'## df_extract after trim: {df_extract.shape}')
+
+          print(f'Extract and scale data from df_extract')
+          X_inject,_ = self.scale(df_extract)
+          print(f'## X_inject: {X_inject.shape}')
+          print(f'## X_inject:\n{X_inject}')
+          print(f'Injecting data into X_input')
+          X_input = np.concatenate((X_input, X_inject))
+          print(f'## X_input: {X_input.shape}')
+
+          # Also, inject into df_input for later selection
+          missing_date_end = missing_date_start + ((self.LABEL_WINDOW-1) * STEP_OFFSET)
+          date_index = pd.date_range(missing_date_start, missing_date_end, freq='MS')
+          # print(f'## date_index: {date_index}')
+          df_extract['newidx'] = date_index
+          df_extract.set_index('newidx', drop=True, inplace=True)
+          # print(f'## df_extract: {df_extract.shape}')
+          # print(f'## df_input BEFORE: {df_input.shape}')
+          df_input = pd.concat([df_input,df_extract])
+          # print(f'## df_input AFTER: {df_input.shape}')
+          # print(f'## df_input AFTER:\n{df_input}')
+
+          # FINALLY - adjust last data index
+          last_data_idx = last_data_idx + X_inject.shape[0]
+          print(f'## last_data_idx: {last_data_idx}')
+
+
+    ## --- End of Prediction loop ---
+
 
     ##"""**Show Predictions**"""
 
-    num_predictions = len(preds)
+    num_predictions = len(all_preds)
     print(f'Num Exp. Predictions: {num_predictions}')
+    print(f'First pred: {first_label_date}')
+    print(f'Last pred: {last_label_date}')
 
-    # Get date frame for injecting predicted results
-    # start step is data last step + 1
-    last_step = df_input.index[-1]
-    print(f'## Last data step: {last_step}')
-    first_pred = last_step + STEP_OFFSET
-    print(f'## First pred step: {first_pred}')
-    last_pred = first_pred
-    for i in range(num_predictions):
-      last_pred = last_pred + STEP_OFFSET
-    print(f'## Last pred step: {last_pred}')
+    # Creating timestamped container
+    df_results = create_timeindexed_df(first_label_date, last_label_date+STEP_OFFSET, self.STEP_FREQ)
+    df_results['preds'] = all_preds
 
-    df_results = create_timeindexed_df(first_pred, last_pred, self.STEP_FREQ)
-    df_results['preds'] = preds
+    # Remove input data that won't have predicted labels
+    df_input = df_input.iloc[first_label_index:,:]
 
     # Combine input and preds
-    #TODO - how to show as different yet continuous marks
     df_input = df_retain(df_input, self.TARGET_LABEL)
-    df_aggr = df_input.merge(df_results, how='outer', left_index=True,right_index=True, suffixes=[None,'net'])
+    df_input = df_input.loc[first_label_date:last_label_date,:]
+    # Blank out all post-data "known temps" to ensure preds are graphed alone - it's all prediction at that point
+    df_input.loc[last_input_date:,self.TARGET_LABEL] = np.nan
+    df_aggr = df_input.merge(df_results, how='inner', left_index=True,right_index=True, suffixes=['net',None])
+    df_aggr.rename({self.TARGET_LABEL:'y_val'}, axis=1)
 
-    print(df_aggr)
+    print(f'## df_aggr: {df_aggr}')
+    # Make a backup copy of this df, for other graphing
+    df_results = df_aggr.copy()
 
     # Finally, we have to reduce to a simple index to make the graphing work nicely
     df_aggr.reset_index(inplace=True, drop=False, names='pred_dates')
@@ -362,38 +505,107 @@ class ModelExecutor():
     # and now we can drop it
     df_aggr.drop(columns=['pred_dates'], inplace=True)
 
-    ##"""**Analyze results**"""
-
-    #print(df_results)
+    # --- Plot 1 ---
 
     # Plot results - Y vs. Pred
     TICK_SPACING=6
-    fig, ax = plt.subplots(figsize=(8,6), layout="constrained")
+    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
     sns.lineplot(data=df_aggr, ax=ax)
     ax.set_xticks(df_aggr.index, labels=date_labels, rotation=90)
     ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
     plt.xlabel('Time steps')
     plt.ylabel('Temp in degrees C')
-    plt.legend(('Recent','Predicted'))
-    plt.title(f'Prediction of next {self.LABEL_WINDOW} {self.STEP_FREQ} Steps', fontsize=16)
+    title = f'Prediction of Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)} Timesteps'
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.annotate(f'Generated from {self.MODEL_NAME} model {self.MODEL_FILENAME}                      ',
+                xy=(1, 1),  # point to annotate - see xycoords for units
+                xytext=(-50, 10),  # offset from xy - units in textcoords
+                xycoords='axes fraction',  # how coords are translated?
+                textcoords='offset pixels',  # 'axes fraction', 'offset pixels'
+                horizontalalignment='right',
+                bbox=dict(boxstyle='square,pad=-0.07', fc='none', ec='none')
+                )
+    ax.texts[0].set_size(10)
     plt.show()
 
-    # write pred results out
-    # df_results['pred_dates'] = date_labels
-    # df_results.to_csv(self.LOG_PATH + f'model-preds-{serial}.csv', index_label='index')
-
-    # Clear axis
     ax.clear()
 
+    # --- Plot 2 ---
+    # Avg Temp box-plot
 
-  def process(self):
+    # Before post-data predictions, have all predicted temps reflect actual measurements
+    # We will graph from a single column, going as far back as possible
 
-    # It's time to set date as index and remove from dataset
-    if (self.merger.DATE_COL in self.df_merge.columns):
-      self.df_merge.set_index(self.merger.DATE_COL, inplace=True, drop=True)
+    # Get original data; truncate at start of predictions
+    df_aggr = df_retain(self.df_merge, [self.TARGET_LABEL,self.merger.DATE_COL])
+    df_aggr.rename({self.merger.DATE_COL:'date', self.TARGET_LABEL:'preds'}, axis=1, inplace=True)
+    df_aggr.set_index('date', drop=True, inplace=True)
+    print(f'## df_aggr:\n{df_aggr}')
 
-    # Remove piecemeal date fields as well
-    self.df_merge.drop(columns=['day','month','year'], inplace=True)
+    print(f'## df_decades:\n{df_decades}')
+    df_decades.reset_index(inplace=True, drop=True)
+    df_decades.rename({self.TARGET_LABEL:'preds'},axis=1, inplace=True)
+
+    # Make results narrow and shorter
+    df_graph = df_retain(df_results, ['preds'])
+    df_graph = df_graph.loc[last_input_date+STEP_OFFSET:,:]
+    print(f'## df_graph:\n{df_graph}')
+    df_graph.reset_index(inplace=True, drop=False, names='date')
+    df_graph['decade'] = [round(dt.year, -1) for dt in df_graph['date']]
+    df_graph.drop(columns=['date'], inplace=True)
+    print(f'## df_graph:\n{df_graph}')
+
+    # Merge
+    df_graph = pd.concat([df_aggr,df_graph])
+    df_decades.merge(df_graph, how='outer', left_index=False, right_index=False, suffixes=['_orig',None])
+    df_decades.reset_index(inplace=True, drop=True)
+    df_decades.rename(columns={'decade':'Decade', 'preds':'Mean Degrees Celsius'}, inplace=True)
+    print(f'## df_decades:\n{df_decades}')
+
+    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
+    sns.boxplot(data=df_decades, x="Decade", y='Mean Degrees Celsius', ax=ax)
+    title = f'Global Mean Temp - the Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)}s by Decade'
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.axvspan(5.5, 7.5, alpha=0.2)  # add shading
+    plt.show()
+
+
+  def freq_to_english(self, step):
+    return self.FREQ_LABELS[step]
+
+  def scale(self, df, y_vals=None):
+
+    if (self.column_transformer is None):
+      # Set up global dataset transformers -- for this reason we need the Y data as well!!
+      if (y_vals is None):
+        print('WARN: scale() has no Y data, cannot set up Y scaler')
+      # Dynamically build a scaler from name
+      #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
+      module = importlib.import_module('sklearn.preprocessing')
+      ScalerClass = getattr(module, self.SCALER_NAME)
+      num_scaler = ScalerClass()
+      print(f'## Scaler type: {type(num_scaler)}')
+
+      # Create small pipeline for numerical features
+      numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
+                                          ('scale', num_scaler)])
+      # Create Transformer from pipeline
+      con_lst = df.select_dtypes(include='number').columns.to_list()
+      self.column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
+      self.column_transformer.fit(df)
+      # Construct Y/label scaler
+      self.label_scaler = ScalerClass()
+      self.label_scaler.fit(y_vals.values.reshape(-1, 1))
+
+    X_tx = self.column_transformer.transform(df)
+    y_tx = None
+    if (y_vals is not None):
+      y_tx = self.label_scaler.transform(y_vals.values.reshape(-1, 1))
+    return X_tx, y_tx
+
+  def train(self):
+
+    self.init_date_cols(self.df_merge)
 
     NUM_FEATURES = len(self.df_merge.columns)
     print(self.df_merge)
@@ -437,56 +649,19 @@ class ModelExecutor():
 
     ## """**Scale data**
 
-    # Doing this **after** the split means that training data doesn't get unfair advantage of looking ahead into the 'future' during test & validation.
-
-    # Dynamically build a scaler from name
-    #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
-    module = importlib.import_module('sklearn.preprocessing')
-    ScalerClass = getattr(module, self.SCALER_NAME)
-    num_scaler = ScalerClass()
-    label_scaler = ScalerClass()
-    print(f'## Scaler type: {type(num_scaler)}')
-
-    # Create small pipeline for numerical features
-    numeric_pipeline = Pipeline(steps = [('impute', SimpleImputer(strategy='mean')),
-                                        ('scale', num_scaler)])
-
-    # get names of numerical features
-    con_lst = df_train.select_dtypes(include='number').columns.to_list()
-
-    # Transformer for applying Pipelines
-    column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
-
-    # Transform data features
-    X_train_tx = column_transformer.fit_transform(df_train)
-    X_test_tx = column_transformer.transform(df_test)
+    X_train_tx, y_train_tx = self.scale(df_train, y_train)
+    X_test_tx,_ = self.scale(df_test)
     if (self.VAL_RATIO > 0):
-      X_val_tx = column_transformer.transform(df_val)
-    #X_train_tx.shape, X_test_tx.shape, X_val_tx.shape
+      X_val_tx,_ = self.scale(df_val)
 
-    # Transform labels
-    y_train_tx = label_scaler.fit_transform(y_train.values.reshape(-1, 1))
-
-    # Slice labels - we cannot predict anything inside the first INPUT_WINDOW
-    # WindowGenerator does this for us now
-    #y_train_tx = y_train_tx[INPUT_WINDOW:]
+    NUM_LABELS = y_train_tx.shape[1]
+    COLS = list(self.df_merge.columns)
 
     if self.debug:
+      print(f'Num features: {len(COLS)}')
+      print(f'Num labels: {NUM_LABELS}')
       print(f'X_train_tx {X_train_tx.shape}: {X_train_tx[0]}')
       print(f'y_train_tx {y_train_tx.shape}: {y_train_tx[0]}')
-
-    ## """**Extract X and y**
-
-    # Normally we would do this by explicitly extracting data from our df.
-    # However for a time series, we're going to create many small supervised learning sets, so a set of X and y pairs.
-    # We should end up with data in a shape ready for batched network input:
-    # `batches X time_steps X features`
-    NUM_LABELS = y_train_tx.shape[1]
-
-    ## **Modeling**
-
-    # These are the features we are going to be modeling
-    COLS = list(self.df_merge.columns)
 
     ## """**Slice into Batches**"""
 
@@ -506,8 +681,6 @@ class ModelExecutor():
 
     ##"""**Build model**"""
 
-    #model = ModelLSTMv2(window_size=self.INPUT_WINDOW, num_epochs=self.NUM_EPOCHS, debug=True)
-
     # Use factory for flexible selection
     mf = self.get_model_factory(NUM_LABELS)
     print (mf)
@@ -517,7 +690,6 @@ class ModelExecutor():
 
     ##"""**Train model**"""
 
-    #model.train(X, y, NUM_FEATURES)
     print(f'## Training model with {NUM_FEATURES} features and {NUM_LABELS} labels')
     model_history = model.train(dataset=ds, num_features=NUM_FEATURES)
 
@@ -533,28 +705,23 @@ class ModelExecutor():
     pred_dates = []
     y_test_vals = []
 
-    # Defaults to a single Day
-    STEP_OFFSET = pd.DateOffset()
-
-    if (self.STEP_FREQ == 'M'):
-      STEP_OFFSET = pd.DateOffset(months=1)
-    else:
-      STEP_OFFSET = pd.DateOffset(years=1)
+    # How we will count between timesteps
+    STEP_OFFSET = self.get_step_offset()
 
     for p in range(num_predictions):
       # Prepare inputs
       #print(f'Pred range: x_test_tx[{p}:{p+self.INPUT_WINDOW}]')
-      X_pred = X_test_tx[p:p+self.INPUT_WINDOW,:].reshape(-1, self.INPUT_WINDOW, NUM_FEATURES)
+      X_pred = X_test_tx[p:p+self.INPUT_WINDOW, :].reshape(-1, self.INPUT_WINDOW, NUM_FEATURES)
 
       # Prepare outputs
-      label_start_index = p+self.INPUT_WINDOW
-      #print(f'Exp output: y_test[{label_start_index}:{label_start_index + self.LABEL_WINDOW}]')
-      y_test_vals.append(y_test[label_start_index:label_start_index + self.LABEL_WINDOW])
+      label_start_idx = p+self.INPUT_WINDOW
+      #print(f'Exp output: y_test[{label_start_idx}:{label_start_idx + self.LABEL_WINDOW}]')
+      y_test_vals.append(y_test[label_start_idx:label_start_idx+self.LABEL_WINDOW])
 
       if (self.LABEL_WINDOW == 1):
-        print(f'Pred date: {df_test.index[label_start_index]}')
+        print(f'Pred date: {df_test.index[label_start_idx]}')
       else:
-        print(f'Pred dates: {df_test.index[label_start_index]} + {self.LABEL_WINDOW-1} steps')
+        print(f'Pred dates: {df_test.index[label_start_idx]} + {self.LABEL_WINDOW-1} steps')
 
       # Predict
       batch_preds = model.predict(X_pred)
@@ -564,16 +731,16 @@ class ModelExecutor():
         batch_preds = batch_preds.reshape(self.LABEL_WINDOW, -1)
 
       # Re-Scale
-      pred_vals = label_scaler.inverse_transform(batch_preds)
+      pred_vals = self.label_scaler.inverse_transform(batch_preds)
       # Reduce to single array
       pred_vals = np.squeeze(pred_vals)
 
       if (self.LABEL_WINDOW == 1):
         preds.append(pred_vals.ravel())
-        pred_dates.append(df_test.index[label_start_index])
+        pred_dates.append(df_test.index[label_start_idx])
       else:
         # Add one row per label output; we need to increment the date manually
-        pred_start_date = df_test.index[label_start_index]
+        pred_start_date = df_test.index[label_start_idx]
         step_date = pred_start_date
         for val in pred_vals.tolist():
           # add current result values

@@ -36,9 +36,9 @@ debug = False
 RMSE_THRESHOLD = 0.2
 
 # Plot a certain result??  0 for all
-SHOW_SERIAL = 922970  # set to 0 to show just the best
+SHOW_SERIAL = 568003  # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-DATA_ROOT = DRIVE_PATH + "data/preds-s30/"
+DATA_ROOT = DRIVE_PATH + "data/preds-s24/"
 JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 ## ###############################

@@ -121,8 +121,6 @@ exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL
                     num_epochs=3, target_label=TARGET_LABEL, model_name=MODEL_NAME, scaler=SCALER, alpha=ALPHA, plot=True, debug=True)
 
 exec.load_initial_dataset(INITIAL_DATASET['filename'], INITIAL_DATASET['feature_map'], date_map=None, date_col=INITIAL_DATASET['date_col'])
-
 exec.load_datasets(DATASETS)
-
-exec.load_model(f'{MODEL_PATH}{MODEL_FILENAME}')
-exec.predict()
+exec.load_model(MODEL_PATH, MODEL_FILENAME)
+exec.predict(num_label_windows=2)

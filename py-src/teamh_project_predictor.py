@@ -35,20 +35,36 @@ LOG_PATH = DATA_ROOT + "preds/"
 JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 """**Parameters**"""
 
+# ---- Serialized model w/ params -----
 INPUT_WINDOW = 60
 LABEL_WINDOW = 60
-MODEL_FILENAME = '20231201-2020-Densev1-568003.hdf5'
-MODEL_PATH = DATA_ROOT + "preds-s24/"
+MODEL_FILENAME = '20231211-0400-Densev1-823252.hdf5'
+MODEL_PATH = DATA_ROOT + "preds-s39/"
 MODEL_NAME = 'Densev1'
 SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231210-2334-Densev1-685055.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s38/"
+# MODEL_NAME = 'Densev1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# --------------------------------------
+
 ALPHA = 1e-4
+
 # Start/stop including data from these dates
 # UC1 - global temp pred
-START_DATE =  pd.to_datetime('1950-01-01')
-END_DATE = pd.to_datetime('2015-12-01')
+# START_DATE =  pd.to_datetime('1950-01-01')
+# END_DATE = pd.to_datetime('2015-12-01')
 # UC2 - historical model
-# START_DATE =  pd.to_datetime('1850-01-01')
-# END_DATE = pd.to_datetime('2023-10-01')
+START_DATE =  pd.to_datetime('1850-01-01')
+END_DATE = pd.to_datetime('2023-10-01')
+
+# How many Label Windows to predict ahead?  Balances this number w/ Label Windows BEFORE end of data;
+#   so, plan to have at least (NUM_PREDICTION_WINDOWS*LABEL_WINDOW)+INPUT_WINDOW years of data available
+NUM_PREDICTION_WINDOWS=4
 
 """**Dataset Definitions**"""
 
@@ -112,8 +128,21 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
                'date_col':'date'}
 
 """**Run Parameters**"""
-INITIAL_DATASET = TEMP_DATA
-DATASETS=[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]
+# Base everything on this dataset
+# INITIAL_DATASET = TEMP_DATA     #UC1
+INITIAL_DATASET = AIR_TEMP_DATA  #UC3
+
+# Label to predict
+# TARGET_LABEL = 'landSeaAvgTemp'  #UC1
+TARGET_LABEL = 'airPrefAvgTemp' #UC3
+
+# Use case 1
+# DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
+#   [SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA, POLICY_DATA]
+# ]
+
+# Use case 3
+DATASETS=[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
 
 """# Set up and run Predictions """
 exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
@@ -123,4 +152,4 @@ exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL
 exec.load_initial_dataset(INITIAL_DATASET['filename'], INITIAL_DATASET['feature_map'], date_map=None, date_col=INITIAL_DATASET['date_col'])
 exec.load_datasets(DATASETS)
 exec.load_model(MODEL_PATH, MODEL_FILENAME)
-exec.predict(num_label_windows=2)
+exec.predict(num_label_windows=NUM_PREDICTION_WINDOWS)

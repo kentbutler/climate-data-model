@@ -114,7 +114,7 @@ class ModelExecutor():
     self.VAL_RATIO = val_ratio
     self.NUM_EPOCHS = num_epochs
     self.TARGET_LABEL = target_label
-    self.TARGET_LABELS = [target_label] # for future expansion
+    self.TARGET_LABELS = [target_label]
     self.MODEL_NAME = model_name
     self.SCALER_NAME = scaler
     self.ALPHA = alpha
@@ -258,16 +258,10 @@ class ModelExecutor():
     # Ensure inputs are sort chronologically, to ensure the index math
     df_input.sort_index(inplace=True)
 
-    # Before we truncate the data, let's get some summary info for later output
-    df_input['decade'] = [round(yr, -1) for yr in df_input['year']]
-    # df_decades = df_input.groupby(['decade'])[self.TARGET_LABEL].agg(['mean'])
-    df_decades = df_retain(df_input, ['decade',self.TARGET_LABEL])
-    # Ensure we don't lose this data
-    df_decades = df_decades.copy()
-    df_input.drop(columns=['decade'], inplace=True)
-
-    # Start of input data block
+    # Start/end of input data block
     start_idx = df_input.shape[0] - ((num_label_windows * self.LABEL_WINDOW) + self.INPUT_WINDOW)
+    input_end_idx = start_idx + self.INPUT_WINDOW - 1
+
     # ...and, just truncate from here
     df_input = df_input.iloc[start_idx: , :]
 
@@ -308,7 +302,6 @@ class ModelExecutor():
     # save these starting points
     first_label_date = pred_start_date
     first_label_index= label_start_idx
-    last_input_date = df_input.index[-1]
 
     ## --- Scale ---
     y_vals = df_input[self.TARGET_LABEL]
@@ -330,21 +323,26 @@ class ModelExecutor():
 
     # Extract X input values as np array
     X_input = np.asarray(X_tx).astype('float32')
-    # last index of X -- beyond this is just speculation
+
+    # last index & date of X -- beyond this is regression territory
     last_data_idx = len(X_input) - 1
+    last_data_date = df_input.index[-1]
+    print(f'## last_data_idx: {last_data_idx}')
+    print(f'## last_data_date: {last_data_date}')
 
     # --- Predict ---
-
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
     print(f'## Begin predicting X_input: {X_input.shape}')
     all_preds = []
 
+    # ======== Start Prediction loop ========
     for p in range(num_predictions):
       preds = []
       pred_dates = []
+
       # --- Boundary checks ---
       # 1. Does our block end align w/ the end of the dataset?  If it goes over, we've done something wrong.
-      if ((start_idx+self.INPUT_WINDOW - 1) > last_data_idx):
+      if (input_end_idx > last_data_idx):
         # Some portion of the prediction output is beyond the "have data" line
         #   set flag so we know that we are in prediction-only space!  from here we need to start rolling
         #   the data back into X_input - i.e, autoregressing
@@ -391,78 +389,97 @@ class ModelExecutor():
           # move to next step
           pred_start_date = (pred_start_date + STEP_OFFSET)
 
+      # ---- Reset Pointers -----
       # input shifts forward same as label windows...because, we want our label windows to be contiguous
       start_idx = start_idx + self.LABEL_WINDOW
-      # starting from PREVIOUS label window start....just move forward another label window
+      input_end_idx = start_idx+self.INPUT_WINDOW - 1
+      # next label starting from PREVIOUS label window start....just move forward another label window
       label_start_idx = label_start_idx + self.LABEL_WINDOW
-      print(f'## NEXT start_idx: {start_idx}')
+
+
+      print(f'## NEXT input_start_idx(start_idx): {start_idx}')
+      print(f'## NEXT input_end_idx: {input_end_idx}')
       print(f'## NEXT label_start_idx: {label_start_idx}')
+      print(f'## NEXT label_start_date(pred_start_date): {pred_start_date}')
+
       print(f'## last_data_idx: {last_data_idx}')
+      print(f'## last_data_date: {last_data_date}')
 
       # If any portion of the INPUT block is over the line, we're auto-regressing
       #    Need to add some input data for the next iteration
       print(f'## IS {start_idx} + {self.INPUT_WINDOW} - 1 ({start_idx + self.INPUT_WINDOW - 1}) > {last_data_idx}')
-      if ((start_idx + self.INPUT_WINDOW - 1) > last_data_idx):
+      if (input_end_idx > last_data_idx):
         # Capture predicted values as input to the next iteration
         #   NOTE!!! We shouldn't have to do this -- we should be predicting ALL FEATURES
-        # ISSUE: what about all the other parameters??  if we're not predicting those....
         # SOL: since right now we're not predicting multiple labels....
         #    WORKAROUND - just replicate last known datapoints, and lay prediction in aside of those
         #           use STEP_FREQ to find a suitable input window
         #           want start to be same
         if (pred_vals.shape[-1] != X_pred.shape[-1]):
           # features input != features predicted
-          #   we need to fake it - copy all input features to output (but NOT THE SAME SIZE)
+          #   we need to fake it - copy all input features to output (but NOT THE SAME SIZE) (what???)
           #    roll the prediction start_date back to align with the new start index
           # we really need to predict from the INPUT side of things - so go back before the label window
-          missing_date_start = cur_step = pred_start_date - (self.INPUT_WINDOW * STEP_OFFSET)
+          missing_date_start = pred_start_date - (self.LABEL_WINDOW * STEP_OFFSET)
+          # cur_step = missing_date_start
+
+          if (missing_date_start < last_data_date):
+            # Hey! we actually have this data; move the pointer forward, to empty slot after last data point
+            missing_date_start = last_label_date + STEP_OFFSET
+
+          # NOTE that the missing input chunk will always be a label width, due to how the labels are aligned and contiguous
+          missing_data_len = self.LABEL_WINDOW
+          print(f'## missing_date_start: {missing_date_start}')
+          print(f'## missing_data_len: {missing_data_len}')
+
           cur_start_idx = start_idx
           found = False
-          print(f'Going back in time to find data aligned with: {cur_step}')
+          print(f'Going back in time to find data to fill from missing start date: {missing_date_start}')
           while (not found):
-            # only need to satisfy the condition that there be enough data for INPUTS; no need for LABEL space
-            #    we're just going to copy the data into X_input
-            cur_step = cur_step - (self.CYCLE_LENGTH[self.STEP_FREQ] * STEP_OFFSET)
-            print(f'Trying step: {cur_step}')
             cur_start_idx = cur_start_idx - self.CYCLE_LENGTH[self.STEP_FREQ]
-            if ((cur_start_idx + self.INPUT_WINDOW) <= last_data_idx):
+            print(f'Trying cur_start_idx: {cur_start_idx}')
+            # did we go back far enough to fit in a label-width of data?
+            if ((start_idx - cur_start_idx) >= missing_data_len):
               found = True
 
-          # print(f'## df_input:\n{df_input}')
-          # print(f'## X_extract: {X_extract.shape}')
-          #TODO this won't work when INPUT_SIZE <> LABEL_SIZE
-          #    in that case we have to overwrite at the END of the block
-          end_step = cur_step + ((self.INPUT_WINDOW-1) * STEP_OFFSET)
-          print(f'Pulling data from {cur_step} to {end_step}')
-          df_extract = df_input.loc[cur_step:end_step]
-          print(f'## df_extract: {df_extract.shape}')
-          print(f'## df_extract last: {df_extract.index[-1]}')
+          cur_end_idx = cur_start_idx + missing_data_len
+          print(f'Pulling data from {cur_start_idx} to {cur_end_idx}')
+          df_extract = df_input.iloc[cur_start_idx:cur_end_idx,:]
+          # print(f'## df_extract: {df_extract.shape}')
+          # print(f'## df_extract last: {df_extract.index[-1]}')
 
-          # if the actual last_data_idx splits the actual input data block - i.e. data exists ONLY up to a point -
-          #   then, ensure we don't overwrite the real data in our extract by lopping the overlap off
-          if ((start_idx < last_data_idx) and (label_start_idx > (last_data_idx+1))):
-            df_extract = df_extract.iloc[(last_data_idx-start_idx):]
-            print(f'## df_extract after trim: {df_extract.shape}')
-
-          print(f'Extract and scale data from df_extract')
-          X_inject,_ = self.scale(df_extract)
-          print(f'## X_inject: {X_inject.shape}')
-          print(f'## X_inject:\n{X_inject}')
-          print(f'Injecting data into X_input')
-          X_input = np.concatenate((X_input, X_inject))
-          print(f'## X_input: {X_input.shape}')
-
-          # Also, inject into df_input for later selection
+          # Create the proper date index for the chunk we want to add -
+          #   and inject into df_input for later selection
           missing_date_end = missing_date_start + ((self.LABEL_WINDOW-1) * STEP_OFFSET)
-          date_index = pd.date_range(missing_date_start, missing_date_end, freq='MS')
+          date_index = pd.date_range(missing_date_start, missing_date_end, freq='MS', normalize=True)
           # print(f'## date_index: {date_index}')
           df_extract['newidx'] = date_index
           df_extract.set_index('newidx', drop=True, inplace=True)
+          fdate = df_extract.index[0]
+
+          # Now, update target values w/ the predicted, for better AR
+          for i,date in enumerate(pred_dates):
+            if (date > last_data_date):
+              # This is an actual future prediction -- we DO want to overwrite the df_input
+              #   temp w/ our prediction, so we can autoregress better
+              df_extract.loc[date.normalize()][self.TARGET_LABEL] = preds[i]
+
+          # Add to X_input
+          # print(f'Extract and scale data from df_extract')
+          X_inject,_ = self.scale(df_extract)
+          print(f'## X_inject: {X_inject.shape}')
+          # print(f'## X_inject:\n{X_inject}')
+          # print(f'Injecting data into X_input')
+          X_input = np.concatenate((X_input, X_inject))
+          print(f'## X_input: {X_input.shape}')
+
+          # Add to df_input
           # print(f'## df_extract: {df_extract.shape}')
           # print(f'## df_input BEFORE: {df_input.shape}')
+          print(f'## To df_input ending at {df_input.index[-1]} concat df_extract starting at {df_extract.index[0]}')
           df_input = pd.concat([df_input,df_extract])
           # print(f'## df_input AFTER: {df_input.shape}')
-          # print(f'## df_input AFTER:\n{df_input}')
+          print(f'## df_input AFTER:\n{df_input}')
 
           # FINALLY - adjust last data index
           last_data_idx = last_data_idx + X_inject.shape[0]
@@ -479,7 +496,7 @@ class ModelExecutor():
     print(f'First pred: {first_label_date}')
     print(f'Last pred: {last_label_date}')
 
-    # Creating timestamped container
+    # Create timestamped container to contain all predictions
     df_results = create_timeindexed_df(first_label_date, last_label_date+STEP_OFFSET, self.STEP_FREQ)
     df_results['preds'] = all_preds
 
@@ -488,11 +505,16 @@ class ModelExecutor():
 
     # Combine input and preds
     df_input = df_retain(df_input, self.TARGET_LABEL)
+    print(f'## df_input PRE_SLICE: {df_input}')
     df_input = df_input.loc[first_label_date:last_label_date,:]
+
     # Blank out all post-data "known temps" to ensure preds are graphed alone - it's all prediction at that point
-    df_input.loc[last_input_date:,self.TARGET_LABEL] = np.nan
+    #TODO comment this out while testing the injection of pred values, s.t. we get "better" AR inputs
+    df_input.loc[last_data_date+STEP_OFFSET:, self.TARGET_LABEL] = np.nan
+
+    print(f'## MERGING ##\n## df_input.index: {df_input.index}')
+    print(f'## df_results.index: {df_results.index}')
     df_aggr = df_input.merge(df_results, how='inner', left_index=True,right_index=True, suffixes=['net',None])
-    df_aggr.rename({self.TARGET_LABEL:'y_val'}, axis=1)
 
     print(f'## df_aggr: {df_aggr}')
     # Make a backup copy of this df, for other graphing
@@ -509,7 +531,8 @@ class ModelExecutor():
 
     # Plot results - Y vs. Pred
     TICK_SPACING=6
-    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
+    width = 10 + (num_label_windows * 2)
+    fig, ax = plt.subplots(figsize=(width,6), layout="constrained")
     sns.lineplot(data=df_aggr, ax=ax)
     ax.set_xticks(df_aggr.index, labels=date_labels, rotation=90)
     ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
@@ -533,41 +556,89 @@ class ModelExecutor():
     # --- Plot 2 ---
     # Avg Temp box-plot
 
-    # Before post-data predictions, have all predicted temps reflect actual measurements
+    # Before post-data predictions, all temps reflect actual measurements
     # We will graph from a single column, going as far back as possible
 
-    # Get original data; truncate at start of predictions
-    df_aggr = df_retain(self.df_merge, [self.TARGET_LABEL,self.merger.DATE_COL])
-    df_aggr.rename({self.merger.DATE_COL:'date', self.TARGET_LABEL:'preds'}, axis=1, inplace=True)
-    df_aggr.set_index('date', drop=True, inplace=True)
-    print(f'## df_aggr:\n{df_aggr}')
 
-    print(f'## df_decades:\n{df_decades}')
-    df_decades.reset_index(inplace=True, drop=True)
-    df_decades.rename({self.TARGET_LABEL:'preds'},axis=1, inplace=True)
 
-    # Make results narrow and shorter
-    df_graph = df_retain(df_results, ['preds'])
-    df_graph = df_graph.loc[last_input_date+STEP_OFFSET:,:]
-    print(f'## df_graph:\n{df_graph}')
-    df_graph.reset_index(inplace=True, drop=False, names='date')
-    df_graph['decade'] = [round(dt.year, -1) for dt in df_graph['date']]
-    df_graph.drop(columns=['date'], inplace=True)
-    print(f'## df_graph:\n{df_graph}')
+    # Move date out of index b/c that will impede the upcoming apply
+    df_results.reset_index(inplace=True, drop=False, names='date')
 
-    # Merge
-    df_graph = pd.concat([df_aggr,df_graph])
-    df_decades.merge(df_graph, how='outer', left_index=False, right_index=False, suffixes=['_orig',None])
-    df_decades.reset_index(inplace=True, drop=True)
-    df_decades.rename(columns={'decade':'Decade', 'preds':'Mean Degrees Celsius'}, inplace=True)
-    print(f'## df_decades:\n{df_decades}')
+    print(f'## df_results BEFORE FILL:\n{df_results}')
+    # Fill in missing temp values from predictions
+    df_results[self.TARGET_LABEL] = df_results.apply(lambda x: x.preds if np.isnan(x.airPrefAvgTemp) else x.airPrefAvgTemp, axis=1)
+    print(f'## df_results AFTER FILL:\n{df_results}')
+
+    df_results['Decade'] = [round(dt.year, -1) for dt in df_results['date']]
+    df_results.drop(columns=['date','preds'], inplace=True)
+    df_results.rename({self.TARGET_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
+    print(f'## df_results AFTER CLEANUP:\n{df_results}')
 
     fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
-    sns.boxplot(data=df_decades, x="Decade", y='Mean Degrees Celsius', ax=ax)
+    sns.boxplot(data=df_results, x="Decade", y='Mean Degrees Celsius', ax=ax)
     title = f'Global Mean Temp - the Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)}s by Decade'
     ax.set_title(title, fontsize=16, pad=20)
-    ax.axvspan(5.5, 7.5, alpha=0.2)  # add shading
+    # ax.axvspan(5.5, 7.5, alpha=0.2)  # add shading
     plt.show()
+
+    ax.clear()
+
+    # --- Plot 3 ---
+    # Avg Temp box-plot going ALL the way back
+
+    # Get original data; truncate at start of predictions
+    df_all = df_retain(self.df_merge, [self.TARGET_LABEL,self.merger.DATE_COL])
+    df_all.rename({self.merger.DATE_COL:'date'}, axis=1, inplace=True)
+    df_all['Decade'] = [round(dt.year, -1) for dt in df_all['date']]
+    df_all.drop(columns=['date'], inplace=True)
+    df_all.rename({self.TARGET_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
+
+    # truncate existing data
+    df_all = df_all[df_all['Decade'] < 1990]
+    print(f'## df_all AFTER TRUNC:\n{df_all}')
+
+    df_graph = pd.concat([df_all,df_results])
+
+    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
+    sns.boxplot(data=df_graph, x="Decade", y='Mean Degrees Celsius', ax=ax)
+    title = f'Global Mean Temp - the Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)}s by Decade'
+    ax.set_title(title, fontsize=16, pad=20)
+    # ax.axvspan(5.5, 7.5, alpha=0.2)  # add shading
+    plt.show()
+
+    ax.clear()
+
+    # --- Plot 4 ---
+    # Trailing temp band
+    print(f'## df_graph :\n{df_graph}')
+
+    # g = sns.lmplot(x="Decade", y="Mean Degrees Celsius", col="Mean Degrees Celsius", hue="Mean Degrees Celsius", data=df_all,
+    #                 y_jitter=.02, logistic=True, truncate=False)
+    # g.set(xlim=(0, 80), ylim=(-.05, 1.05))
+    # sns.regplot(data=df_graph, x="Decade", y="Mean Degrees Celsius")
+    # plt.show()
+    # sns.lmplot(data=df_graph, x="Decade", y="Mean Degrees Celsius")
+    # plt.show()
+
+    g = sns.relplot(
+      data=df_graph, x="Decade", y="Mean Degrees Celsius",  #col="year", hue="year",
+      kind="line", palette="crest", linewidth=6, zorder=1,
+      height=6, aspect=1.5, legend=True
+    )
+    # Iterate over each subplot to customize further
+    for year, ax in g.axes_dict.items():
+      # Add the title as an annotation within the plot
+      ax.text(.8, .85, year, transform=ax.transAxes, fontweight="bold")
+      # Plot every year's time series in the background
+      sns.lineplot(
+        data=df_graph, x="Decade", y="Mean Degrees Celsius",  # col="year", hue="year",
+        units='year', estimator=None, color=".7", linewidth=5, ax=ax
+      )
+    ax.set_xticks(ax.get_xticks()[::10])
+
+    g.tight_layout()
+    plt.show()
+
 
 
   def freq_to_english(self, step):

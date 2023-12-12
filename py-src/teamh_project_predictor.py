@@ -36,12 +36,20 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 """**Parameters**"""
 
 # ---- Serialized model w/ params -----
-INPUT_WINDOW = 60
-LABEL_WINDOW = 60
-MODEL_FILENAME = '20231211-0400-Densev1-823252.hdf5'
-MODEL_PATH = DATA_ROOT + "preds-s39/"
-MODEL_NAME = 'Densev1'
-SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0400-Densev1-823252.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s39/"
+# MODEL_NAME = 'Densev1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 685055
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231210-2334-Densev1-685055.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s38/"
+# MODEL_NAME = 'Densev1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
 
 # INPUT_WINDOW = 84
 # LABEL_WINDOW = 60
@@ -49,6 +57,55 @@ SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
 # MODEL_PATH = DATA_ROOT + "preds-s38/"
 # MODEL_NAME = 'Densev1'
 # SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 956965
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0347-TXERv1-956965.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s39/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 971088
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0235-TXERv1-971088.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s39/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+#  263281
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0719-TXERv1-263281.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s40/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'StandardScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 50120
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0621-TXERv1-50120.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s40/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 382025
+# INPUT_WINDOW = 120
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0828-TXERv1-382025.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s40/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
+# 451509
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0400-LSTMv32-451509.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s39/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+
 
 # --------------------------------------
 

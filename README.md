@@ -101,11 +101,10 @@ csv_result_processor_all.py
 on the result directory will produce graphical summaries like the following:
 
 
+
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds35-rmse.png?raw=true)
 
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds35-summary.png?raw=true)
-
-
 
 
 
@@ -134,7 +133,9 @@ where the `MODEL_FILENAME` references a particular trained model based on genera
 
 This will produce graphical summaries like the following:
 
-![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-pred.png.png?raw=true)
+
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-pred.png?raw=true)
 
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-box-sm.png?raw=true)
 

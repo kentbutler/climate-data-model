@@ -98,11 +98,21 @@ Running
 ```
 csv_result_processor_all.py
 ```
-will then produce a graphical summary of results.  Model files and metadata/metrics for each indivual run is also recorded.
+on the result directory will produce graphical summaries like the following:
 
-Observing the details of individual training results can be done in this same script by serial number, or by setting a METRIC threshold, which will locate and graph all results better than the threshold.
 
-Locating a desired model for creation of inference can be done by running
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds35-rmse.png?raw=true)
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-uc1-bestperformers.png?raw=true)
+
+
+
+
+Model files, metadata and metrics for each individual run is also recorded. Observing these can be done with this same script using the test serial number, available in `cv-results.csv`, or by setting a METRIC threshold, which will locate and graph all results better than the threshold. That will produce a specific graphical summary like the following:
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds38-bestfit.png?raw=true)
+
+Running inference using a trained model can be done by executing
 ```
 teamh_project_predictor.py
 ```
@@ -116,9 +126,18 @@ MODEL_NAME = 'TXERv1'
 SCALER = 'MinMaxScaler'
 
 ```
-where the `MODEL_FILENAME` references a particular trained model based on generated serial number.
+where the `MODEL_FILENAME` references a particular trained model based on generated serial number. _Note_ that model parameters configured here need to match those for the given model. See `cv-results.csv` for these.
 
-See the `data/preds` folder for all output artifacts.
+This will produce graphical summaries like the following:
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-pred.png.png?raw=true)
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-box-sm.png?raw=true)
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-box-lg.png?raw=true)
+
+
+**General:** See the `data/preds` folder for all output artifacts.
 
 
 

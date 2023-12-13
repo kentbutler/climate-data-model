@@ -128,8 +128,13 @@ MODEL_PATH = DATA_ROOT + "preds-s39/"
 MODEL_NAME = 'TXERv1'
 SCALER = 'MinMaxScaler'
 
+GRAPH_LABEL = 'airPrefAvgTemp'
+TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp']
+
 ```
-where the `MODEL_FILENAME` references a particular trained model based on generated serial number. _Note_ that model parameters configured here need to match those for the given model. See `cv-results.csv` for these.
+where the `MODEL_FILENAME` references a particular trained model based on generated serial number; `GRAPH_LABEL` identifiers a datapoint to focus on in results; and `TARGET_LABELS` identifies all datapoints configured in the original training dataset which should be included in the inference.  More than one item implies multi-label regression.
+
+ _Note_ that model parameters configured here need to match those for the given model. See `cv-results.csv` for these.
 
 This will produce graphical summaries like the following:
 

@@ -20,12 +20,12 @@ Summary of the **Python scripts** intended to run directly from the CLI:
 
 | Script                  | Description            |
 |--------------------------|-----------------------|
-| teamh_project_maindriver.py | Simple Cross-Validation script. Specify datasets, models, and hyperparameters to test with. Prepares sthe `cv-results.csv` output summary. |
-|csv_result_processor_all.py  | Execute against an entire results directory; reads `results-cv.csv` and graphs summary info and the top N results based on METRIC. Set directory name directly in script before running. |
-| teamh_project_predictor.py | Given the descriptor of a saved model, execute predictions using that model for the input parameters. |
-|overall_results_crawler.py  | Execute against several directories and summarize model performances based on hyperparameters. Set directory names directly in script before running. |
-| netcdf_reader.py | For reading and parsing of netCDF-formatted data.  This is a prototype. |
-| teamh_project_main.py | Copy of the `ipynb` discovery notebook for running individual models. Not maintained. |
+| `teamh_project_maindriver.py` | Simple Cross-Validation script. Specify datasets, models, and hyperparameters to test with. Prepares sthe `cv-results.csv` output summary. |
+|`csv_result_processor_all.py` | Execute against an entire results directory; reads `results-cv.csv` and graphs summary info and the top N results based on METRIC. Set directory name directly in script before running. |
+| `teamh_project_predictor.py` | Given the descriptor of a saved model, execute predictions using that model for the input parameters. |
+|`overall_results_crawler.py`  | Execute against several directories and summarize model performances based on hyperparameters. Set directory names directly in script before running. |
+| `netcdf_reader.py` | For reading and parsing of netCDF-formatted data.  This is a prototype. |
+| `teamh_project_main.py` | Copy of the `ipynb` discovery notebook for running individual models. Not maintained. |
 
 
 Summary of the **Python notebooks** available:
@@ -110,7 +110,9 @@ on the result directory will produce graphical summaries like the following:
 
 Model files, metadata and metrics for each individual run is also recorded. Observing these can be done with this same script using the test serial number, available in `cv-results.csv`, or by setting a METRIC threshold, which will locate and graph all results better than the threshold. That will produce a specific graphical summary like the following:
 
+img-preds35-summary.png
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds38-bestfit.png?raw=true)
+
 
 Running inference using a trained model can be done by executing
 ```
@@ -135,6 +137,15 @@ This will produce graphical summaries like the following:
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-box-sm.png?raw=true)
 
 ![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-lstm60-20y-box-lg.png?raw=true)
+
+
+After running enough trials and create multiple results directories, summaries of results ACROSS different result sets can be obtained by setting the desired sub-directories and executing script
+```
+overall_results_crawler.py
+```
+which will produce output like:
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds38-bestfit.png?raw=true)
 
 
 **General:** See the `data/preds` folder for all output artifacts.

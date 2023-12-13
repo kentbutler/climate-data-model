@@ -47,6 +47,9 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, R
   QuantileTransformer, Normalizer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import grangercausalitytests, adfuller
+import statsmodels.api as sm
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
@@ -100,7 +103,7 @@ class ModelExecutor():
     'Y':'Year'
   }
 
-  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_label, model_name, scaler, alpha=1e-4, plot=False, debug=False):
+  def __init__(self, data_path, log_path, journal_log, start_date, end_date, input_window, label_window, shift, test_ratio, val_ratio, num_epochs, target_labels, graph_label, model_name, scaler, alpha=1e-4, plot=False, debug=False):
     self.debug = debug
     self.DATA_PATH = data_path
     self.LOG_PATH = log_path
@@ -113,8 +116,9 @@ class ModelExecutor():
     self.TEST_RATIO = test_ratio
     self.VAL_RATIO = val_ratio
     self.NUM_EPOCHS = num_epochs
-    self.TARGET_LABEL = target_label
-    self.TARGET_LABELS = [target_label]
+    # self.TARGET_LABEL = target_label
+    self.TARGET_LABELS = target_labels
+    self.GRAPH_LABEL = graph_label
     self.MODEL_NAME = model_name
     self.SCALER_NAME = scaler
     self.ALPHA = alpha
@@ -127,6 +131,7 @@ class ModelExecutor():
     self.model_factory = None
     self.model = None
     self.column_transformer = None
+    self.label_scaler = None
 
   def load_initial_dataset(self, ds_name, feature_map, date_map=None, date_col=None):
     # Declare a merger compatible with our source data and our target dataset we want to merge into
@@ -166,16 +171,39 @@ class ModelExecutor():
                                     date_fmt=date_fmt)
 
       if (self.debug):
-        print(self.df_merge)
+        print(f'## df_merge:\n{self.df_merge}')
         print(assess_na(self.df_merge))
 
+    # Clean up dates - load into index
+    self.init_date_cols(self.df_merge)
+
+    # Set global data descriptors
+    self.COLS = self.df_merge.columns
+    self.NUM_LABELS = len(self.TARGET_LABELS)
+
+    if (self.PLOT):
+      # Plot
+      print(f'## df_merge:\n{self.df_merge}')
+      fig, ax = plt.subplots(len(self.COLS)-2,1, figsize=(11,22), layout="constrained")
+      i = 0
+      for col in self.COLS:
+        if ('month' in col):
+          continue
+        sns.lineplot(data=self.df_merge, x=self.df_merge.index, y=col, ax=ax[i])
+        i += 1
+      plt.show()
+
+    # Plot the data scaled as well
+    # X_tx,_ = self.scale(self.df_merge)
+    # sns.lineplot(data=X_tx, ax=ax)
+    # plt.show()
 
   def print_correlations(self):
     # Assess correlations between all data columns
     df_corr = self.df_merge.corr()
 
     # Identify the columns which have medium to strong correlation with target
-    df_corr_cols = df_corr[df_corr[self.TARGET_LABEL] > 0.5]
+    df_corr_cols = df_corr[df_corr[self.GRAPH_LABEL] > 0.5]
 
     # Drop the target from the correlation results in case we want to use this reduced set
     #    in place of the full set
@@ -197,7 +225,43 @@ class ModelExecutor():
                 center=0, annot=labels, fmt = '', linewidths = .5,
                 cmap='vlag', cbar_kws={'shrink':0.8});
     plt.title('Heatmap of correlation among variables', fontsize=20)
+    plt.show()
 
+  def seasonal_decompose(self):
+    df = self.df_merge
+    for label in self.TARGET_LABELS:
+      print(f'### Seasonal decompose of {label}')
+      decomposition = seasonal_decompose(df[label], model='additive', period=7)
+      decomposition.plot()
+
+  def ADF(self):
+    """
+    Asses given data with ADFuller method. Suggest to provide data
+    and differential data and compare results.
+    """
+    df = self.df_merge
+
+    for label in df.columns:
+      if (label in ('day','year','month')):
+        continue
+      # Check if data is stationary or not
+      print(f'Testing field: {label}')
+      adf = adfuller(df[label].values)
+      print('\n---------------------')
+      print(f'ADF Analysis: {label}')
+      print(f'\tADF Statistic: {adf[0]}')
+      print(f'\tp-value: {adf[1]}')
+      if adf[1] > 0.05:
+        print(f'{label}: p-value > 0.05: we fail to reject the null hypothesis - data is not stationary')
+      else:
+        print(f'{label}: p-value <= 0.05: we reject the null hypothesis - data is stationary')
+
+  def acf(self):
+    df = self.df_merge
+    for label in df.columns:
+      print(f'### PACF decompose of {label}')
+      g = sm.graphics.tsa.plot_pacf(df[label], lags=15, title=f'Autocorrelation for {label}')
+      plt.show()
 
   def current_time_ms(self):
     """
@@ -271,7 +335,7 @@ class ModelExecutor():
     # first label start position, so we know how to extract our Y values
     label_start_idx = start_idx + self.INPUT_WINDOW
 
-    self.init_date_cols(df_input)
+    # self.init_date_cols(df_input)
 
     # How we will count between timesteps
     STEP_OFFSET = self.get_step_offset()
@@ -304,7 +368,7 @@ class ModelExecutor():
     first_label_index= label_start_idx
 
     ## --- Scale ---
-    y_vals = df_input[self.TARGET_LABEL]
+    y_vals = df_input[self.TARGET_LABELS]
     X_tx, y_tx = self.scale(df_input, y_vals)
 
     #NUM_LABELS = 1
@@ -415,6 +479,8 @@ class ModelExecutor():
         #    WORKAROUND - just replicate last known datapoints, and lay prediction in aside of those
         #           use STEP_FREQ to find a suitable input window
         #           want start to be same
+        print(f'## pred_vals: {pred_vals.shape}')
+        print(f'## X_pred: {X_pred.shape}')
         if (pred_vals.shape[-1] != X_pred.shape[-1]):
           # features input != features predicted
           #   we need to fake it - copy all input features to output (but NOT THE SAME SIZE) (what???)
@@ -444,7 +510,7 @@ class ModelExecutor():
 
           cur_end_idx = cur_start_idx + missing_data_len
           print(f'Pulling data from {cur_start_idx} to {cur_end_idx}')
-          df_extract = df_input.iloc[cur_start_idx:cur_end_idx,:]
+          df_extract = df_input.iloc[cur_start_idx:cur_end_idx,:].copy()
           # print(f'## df_extract: {df_extract.shape}')
           # print(f'## df_extract last: {df_extract.index[-1]}')
 
@@ -462,7 +528,7 @@ class ModelExecutor():
             if (date > last_data_date):
               # This is an actual future prediction -- we DO want to overwrite the df_input
               #   temp w/ our prediction, so we can autoregress better
-              df_extract.loc[date.normalize()][self.TARGET_LABEL] = preds[i]
+              df_extract.loc[date.normalize()][self.TARGET_LABELS] = preds[i]
 
           # Add to X_input
           # print(f'Extract and scale data from df_extract')
@@ -498,34 +564,49 @@ class ModelExecutor():
 
     # Create timestamped container to contain all predictions
     df_results = create_timeindexed_df(first_label_date, last_label_date+STEP_OFFSET, self.STEP_FREQ)
-    df_results['preds'] = all_preds
+    # for convenience, transpose our batch X features results to  features x batch so we can pull them in
+    all_preds = np.transpose(all_preds)
+    # ...and add each column individually
+    for i,col in enumerate(self.TARGET_LABELS):
+      df_results[col] = all_preds[i]
+
+    # df_results.to_csv('/home/kent/Documents/preds.csv')
 
     # Remove input data that won't have predicted labels
     df_input = df_input.iloc[first_label_index:,:]
 
     # Combine input and preds
-    df_input = df_retain(df_input, self.TARGET_LABEL)
+    df_input = df_retain(df_input, self.TARGET_LABELS)
     print(f'## df_input PRE_SLICE: {df_input}')
     df_input = df_input.loc[first_label_date:last_label_date,:]
 
     # Blank out all post-data "known temps" to ensure preds are graphed alone - it's all prediction at that point
     #TODO comment this out while testing the injection of pred values, s.t. we get "better" AR inputs
-    df_input.loc[last_data_date+STEP_OFFSET:, self.TARGET_LABEL] = np.nan
+    df_input.loc[last_data_date+STEP_OFFSET:, self.TARGET_LABELS] = np.nan
 
-    print(f'## MERGING ##\n## df_input.index: {df_input.index}')
-    print(f'## df_results.index: {df_results.index}')
-    df_aggr = df_input.merge(df_results, how='inner', left_index=True,right_index=True, suffixes=['net',None])
+    # Slicing each dataset at the seam -- then concat - is intuitive, BUT it doesn't get the OVERLAP
+    #    of real vs. pred that we need for the graph
+    # B/c we need the REAL to DROP OFF at the cutoff, and pred to continue on BOTH SIDES of the cutoff
+    print(f'## MERGING ##\n## df_input: {df_input}')
+    print(f'## df_results: {df_results}')
+    df_graph = df_input.merge(df_results, how='inner', left_index=True,right_index=True, suffixes=[None,'_pred'])
 
-    print(f'## df_aggr: {df_aggr}')
+    # Use this combined dataset for graphing of the continuous range of REAL into PRED
+    df_input = df_input.loc[:last_data_date,:]
+    df_results = df_results.loc[last_data_date+STEP_OFFSET:,:]
+    df_aggr = pd.concat([df_input, df_results])
+
     # Make a backup copy of this df, for other graphing
     df_results = df_aggr.copy()
 
     # Finally, we have to reduce to a simple index to make the graphing work nicely
-    df_aggr.reset_index(inplace=True, drop=False, names='pred_dates')
+    df_graph.reset_index(inplace=True, drop=False, names='pred_dates')
     # But we need a date label col
-    date_labels = df_aggr['pred_dates'].apply(lambda x: x.strftime('%Y-%m-%d')).values
+    date_labels = df_graph['pred_dates'].apply(lambda x: x.strftime('%Y-%m-%d')).values
     # and now we can drop it
-    df_aggr.drop(columns=['pred_dates'], inplace=True)
+    # df_graph.drop(columns=['pred_dates'], inplace=True)
+    df_graph = df_retain(df_graph, [self.GRAPH_LABEL, self.GRAPH_LABEL+'_pred'])
+    print(f'## df_graph: {df_graph}')
 
     # --- Plot 1 ---
 
@@ -533,8 +614,8 @@ class ModelExecutor():
     TICK_SPACING=6
     width = 10 + (num_label_windows * 2)
     fig, ax = plt.subplots(figsize=(width,6), layout="constrained")
-    sns.lineplot(data=df_aggr, ax=ax)
-    ax.set_xticks(df_aggr.index, labels=date_labels, rotation=90)
+    sns.lineplot(data=df_graph,  ax=ax)
+    ax.set_xticks(df_graph.index, labels=date_labels, rotation=90)
     ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
     plt.xlabel('Time steps')
     plt.ylabel('Temp in degrees C')
@@ -558,24 +639,22 @@ class ModelExecutor():
 
     # Before post-data predictions, all temps reflect actual measurements
     # We will graph from a single column, going as far back as possible
+    print(f'## df_aggr:\n{df_aggr}')
 
-
-
-    # Move date out of index b/c that will impede the upcoming apply
-    df_results.reset_index(inplace=True, drop=False, names='date')
-
-    print(f'## df_results BEFORE FILL:\n{df_results}')
-    # Fill in missing temp values from predictions
-    df_results[self.TARGET_LABEL] = df_results.apply(lambda x: x.preds if np.isnan(x.airPrefAvgTemp) else x.airPrefAvgTemp, axis=1)
-    print(f'## df_results AFTER FILL:\n{df_results}')
-
-    df_results['Decade'] = [round(dt.year, -1) for dt in df_results['date']]
-    df_results.drop(columns=['date','preds'], inplace=True)
-    df_results.rename({self.TARGET_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
-    print(f'## df_results AFTER CLEANUP:\n{df_results}')
+    # for label in self.TARGET_LABELS:
+    #   print(f'Transferring preds {df_results["preds"].values.shape} to label {self.TARGET_LABELS}')
+    #   # df_results.apply(lambda x: x.preds if np.isnan(x.airPrefAvgTemp) else x.airPrefAvgTemp, axis=1)
+    #   df_results[label] = df_results.apply(lambda x: x.preds if np.isnan(x.airPrefAvgTemp) else x.airPrefAvgTemp, axis=1)
+    # print(f'## df_results AFTER FILL:\n{df_results}')
+    df_aggr.reset_index(drop=False, inplace=True, names='date')
+    df_aggr['Decade'] = [round(dt.year, -1) for dt in df_aggr['date']]
+    # df_aggr.drop(columns=['date','preds'], inplace=True)
+    df_aggr = df_retain(df_aggr, [self.GRAPH_LABEL, 'Decade'])
+    df_aggr.rename({self.GRAPH_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
+    print(f'## df_aggr AFTER CLEANUP:\n{df_aggr}')
 
     fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
-    sns.boxplot(data=df_results, x="Decade", y='Mean Degrees Celsius', ax=ax)
+    sns.boxplot(data=df_aggr, x="Decade", y='Mean Degrees Celsius', ax=ax)
     title = f'Global Mean Temp - the Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)}s by Decade'
     ax.set_title(title, fontsize=16, pad=20)
     # ax.axvspan(5.5, 7.5, alpha=0.2)  # add shading
@@ -587,19 +666,20 @@ class ModelExecutor():
     # Avg Temp box-plot going ALL the way back
 
     # Get original data; truncate at start of predictions
-    df_all = df_retain(self.df_merge, [self.TARGET_LABEL,self.merger.DATE_COL])
-    df_all.rename({self.merger.DATE_COL:'date'}, axis=1, inplace=True)
+    df_all = df_retain(self.df_merge, self.TARGET_LABELS+[self.merger.DATE_COL])
+    df_all.reset_index(drop=False, inplace=True, names='date')
     df_all['Decade'] = [round(dt.year, -1) for dt in df_all['date']]
-    df_all.drop(columns=['date'], inplace=True)
-    df_all.rename({self.TARGET_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
+    df_all = df_retain(df_all, [self.GRAPH_LABEL, 'Decade'])
+    df_all.rename({self.GRAPH_LABEL:'Mean Degrees Celsius'}, axis=1, inplace=True)
+    print(f'## df_all:\n{df_all}')
 
     # truncate existing data
-    df_all = df_all[df_all['Decade'] < 1990]
-    print(f'## df_all AFTER TRUNC:\n{df_all}')
+    df_aggr = df_aggr[df_aggr['Decade'] > 2010]
+    df_all = df_all[df_all['Decade'] <= 2010]
+    df_graph = pd.concat([df_all,df_aggr])
+    print(f'## df_graph AFTER CONCAT:\n{df_graph}')
 
-    df_graph = pd.concat([df_all,df_results])
-
-    fig, ax = plt.subplots(figsize=(10,6), layout="constrained")
+    fig, ax = plt.subplots(figsize=(width,6), layout="constrained")
     sns.boxplot(data=df_graph, x="Decade", y='Mean Degrees Celsius', ax=ax)
     title = f'Global Mean Temp - the Next {num_label_windows * self.LABEL_WINDOW} {self.freq_to_english(self.STEP_FREQ)}s by Decade'
     ax.set_title(title, fontsize=16, pad=20)
@@ -645,16 +725,13 @@ class ModelExecutor():
     return self.FREQ_LABELS[step]
 
   def scale(self, df, y_vals=None):
-
     if (self.column_transformer is None):
-      # Set up global dataset transformers -- for this reason we need the Y data as well!!
-      if (y_vals is None):
-        print('WARN: scale() has no Y data, cannot set up Y scaler')
+      # Set up global dataset transformers
       # Dynamically build a scaler from name
       #TODO: separate out YeoJohnson into its own local class; but have to rework this a bit
       module = importlib.import_module('sklearn.preprocessing')
-      ScalerClass = getattr(module, self.SCALER_NAME)
-      num_scaler = ScalerClass()
+      self.ScalerClass = getattr(module, self.SCALER_NAME)
+      num_scaler = self.ScalerClass()
       print(f'## Scaler type: {type(num_scaler)}')
 
       # Create small pipeline for numerical features
@@ -664,19 +741,24 @@ class ModelExecutor():
       con_lst = df.select_dtypes(include='number').columns.to_list()
       self.column_transformer = ColumnTransformer(transformers = [('number', numeric_pipeline, con_lst)])
       self.column_transformer.fit(df)
-      # Construct Y/label scaler
-      self.label_scaler = ScalerClass()
-      self.label_scaler.fit(y_vals.values.reshape(-1, 1))
+
+    if (self.label_scaler is None):
+      if (y_vals is None):
+        print('WARN: scale() has no Y data, cannot set up Y scaler')
+      else:
+        # Construct Y/label scaler
+        self.label_scaler = self.ScalerClass()
+        self.label_scaler.fit(y_vals.values.reshape(-1, self.NUM_LABELS))
 
     X_tx = self.column_transformer.transform(df)
     y_tx = None
     if (y_vals is not None):
-      y_tx = self.label_scaler.transform(y_vals.values.reshape(-1, 1))
+      y_tx = self.label_scaler.transform(y_vals.values.reshape(-1, self.NUM_LABELS))
     return X_tx, y_tx
 
   def train(self):
 
-    self.init_date_cols(self.df_merge)
+    # self.init_date_cols(self.df_merge)
 
     NUM_FEATURES = len(self.df_merge.columns)
     print(self.df_merge)
@@ -703,10 +785,10 @@ class ModelExecutor():
       df_val = self.df_merge.iloc[NUM_TRAIN:NUM_TRAIN+NUM_VALIDATION, :]
     df_test = self.df_merge.iloc[NUM_TRAIN+NUM_VALIDATION:, :]
 
-    y_train = df_train[self.TARGET_LABEL]
+    y_train = df_train[self.TARGET_LABELS]
     if (self.VAL_RATIO > 0):
-      y_val = df_val[self.TARGET_LABEL]
-    y_test = df_test[self.TARGET_LABEL]
+      y_val = df_val[self.TARGET_LABELS]
+    y_test = df_test[self.TARGET_LABELS]
 
     if self.debug:
       print(f'df_train: {df_train.shape}')
@@ -717,7 +799,6 @@ class ModelExecutor():
         print(f'df_val: {df_val.shape}')
         print(f'y_val: {y_val.shape}')
 
-
     ## """**Scale data**
 
     X_train_tx, y_train_tx = self.scale(df_train, y_train)
@@ -725,12 +806,9 @@ class ModelExecutor():
     if (self.VAL_RATIO > 0):
       X_val_tx,_ = self.scale(df_val)
 
-    NUM_LABELS = y_train_tx.shape[1]
-    COLS = list(self.df_merge.columns)
-
     if self.debug:
-      print(f'Num features: {len(COLS)}')
-      print(f'Num labels: {NUM_LABELS}')
+      print(f'Num features: {len(self.COLS)}')
+      print(f'Num labels: {self.NUM_LABELS}')
       print(f'X_train_tx {X_train_tx.shape}: {X_train_tx[0]}')
       print(f'y_train_tx {y_train_tx.shape}: {y_train_tx[0]}')
 
@@ -753,7 +831,7 @@ class ModelExecutor():
     ##"""**Build model**"""
 
     # Use factory for flexible selection
-    mf = self.get_model_factory(NUM_LABELS)
+    mf = self.get_model_factory(self.NUM_LABELS)
     print (mf)
 
     print(f'Initializing model: {self.MODEL_NAME}')
@@ -761,7 +839,7 @@ class ModelExecutor():
 
     ##"""**Train model**"""
 
-    print(f'## Training model with {NUM_FEATURES} features and {NUM_LABELS} labels')
+    print(f'## Training model with {NUM_FEATURES} features and {self.NUM_LABELS} labels')
     model_history = model.train(dataset=ds, num_features=NUM_FEATURES)
 
     # Capture stat
@@ -796,15 +874,21 @@ class ModelExecutor():
 
       # Predict
       batch_preds = model.predict(X_pred)
-      #print(f'## Batch step: {batch_preds.shape}')
+      print(f'## Batch step: {batch_preds.shape}')
       if (len(batch_preds.shape) > 2):
-        #batch_preds = batch_preds[0]
-        batch_preds = batch_preds.reshape(self.LABEL_WINDOW, -1)
+        # if (batch_preds.shape[2] > 1):
+        #   # yes, multi-label
+        #   batch_preds = batch_preds[0]
+        # else:
+        # NOTE we may have a multi-label output
+        batch_preds = batch_preds.reshape(self.LABEL_WINDOW, self.NUM_LABELS)
 
       # Re-Scale
       pred_vals = self.label_scaler.inverse_transform(batch_preds)
+      print(f'## Scaled preds: {pred_vals.shape}')
       # Reduce to single array
       pred_vals = np.squeeze(pred_vals)
+      print(f'## Squeezed preds: {pred_vals.shape}')
 
       if (self.LABEL_WINDOW == 1):
         preds.append(pred_vals.ravel())
@@ -815,16 +899,35 @@ class ModelExecutor():
         step_date = pred_start_date
         for val in pred_vals.tolist():
           # add current result values
-          #print(f'## val:  type: {type(val)}  value: {val}')
+          print(f'## val:  type: {type(val)}  value: {val}')
           preds.append(val)
           pred_dates.append(step_date)
           #print(f'## Pred: {step_date} {val}')
           # move to next step
           step_date = (step_date + STEP_OFFSET)
 
-    df_all_results = pd.DataFrame({'preds': preds,
-                                  'pred_dates':pred_dates,
-                                   }, index=range(len(preds)))
+    # df_all_results = pd.DataFrame({'pred_dates':pred_dates},
+    #                               index=range(len(preds)))
+
+    print(f'Num Preds: {len(preds)}')
+    df_all_results = pd.DataFrame(index=pred_dates)
+    df_all_results.reset_index(drop=False, inplace=True, names='pred_dates')
+    preds = np.asarray(preds)
+    print(f'### df_all_results: \n{df_all_results}')
+
+    # In anticipation of multiple labels, let's just put all results in 2D
+    if (len(preds.shape) == 1):
+      preds.reshape(self.NUM_LABELS, -1)
+    else:
+      # Results are returned in shape:  batch x feature
+      # it would be more convenient in shape:  feature x batch
+      preds = np.transpose(preds)
+    print(f'preds: {preds.shape}')
+
+    # ...and ASSUME that results come back in the order of target labels given
+    for i in range(preds.shape[0]):
+      df_all_results[self.TARGET_LABELS[i]] = preds[i]
+    print(f'### df_all_results: \n{df_all_results}')
 
     if (self.LABEL_WINDOW > 1):
       # There is probably overlap of output due to this condition
@@ -832,26 +935,27 @@ class ModelExecutor():
       # This will put date into the index
       df_results = df_all_results.groupby(['pred_dates']).mean()
     else:
+      # Move dates out of column and into index, to match result if we had to group it
       df_results = df_all_results
-
-    # Move dates out of column and into index, if it exists
-    if ('pred_dates' in df_results.columns):
       df_results.set_index('pred_dates', drop=True, inplace=True)
+    print(f'### df_results: \n{df_results}')
 
     # Reduce df_test to just the columns and dates necessary
     df_y = df_retain(df_test, self.TARGET_LABELS)
     df_y = df_y[df_results.index.min():df_results.index.max()]
 
+    print(f'## MERGING ##\n## df_input.index: {df_y.index}')
+    print(f'## df_results.index: {df_results.index}')
     # And merge y values into preds
-    df_results = df_y.merge(df_results, how='inner', left_index=True, right_index=True, suffixes=['', '_dft'])
-    df_results = df_results.rename({self.TARGET_LABEL:'y_test'}, axis=1)
+    df_results = df_y.merge(df_results, how='inner', left_index=True, right_index=True, suffixes=['_drop',None])
 
     # Finally, we have to reduce to a simple index to make the graphing work nicely
     df_results.reset_index(inplace=True, drop=False, names='pred_dates')
     # But we need a date label col
     date_labels = df_results['pred_dates'].apply(lambda x: x.strftime('%Y-%m-%d')).values
     # and now we can drop it
-    df_results.drop(columns=['pred_dates'], inplace=True)
+    df_results = df_retain(df_results, self.COLS)
+    # df_results.drop(columns=['pred_dates'], inplace=True)
 
     ##"""**Analyze results**"""
 
@@ -865,53 +969,102 @@ class ModelExecutor():
     # Save model
     model.save_model(self.LOG_PATH, serial)
 
-    print(df_results)
+    print(f'## df_results \n{df_results}')
 
-    # Plot results - Y vs. Pred
-    TICK_SPACING=6
-    fig, ax = plt.subplots(figsize=(8,6), layout="constrained")
-    sns.lineplot(data=df_results, ax=ax)
-    ax.set_xticks(df_results.index, labels=date_labels, rotation=90)
-    ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
-    plt.xlabel('Time steps')
-    plt.ylabel('Temp in degrees C')
-    plt.legend(('Test','Predicted'))
+    if (self.PLOT):
+      # Plot results - Y vs. Pred
+      TICK_SPACING=6
+      fig, ax = plt.subplots(figsize=(8,6), layout="constrained")
+      # Plot
+      fig, ax = plt.subplots(len(df_results.columns),1, figsize=(10,20), layout="constrained")
+      for i, col in enumerate(df_results.columns):
+        sns.lineplot(data=df_results, x=df_results.index, y=col, ax=ax[i])
+      ax[i].set_xticks(df_results.index, labels=date_labels, rotation=90)
+      ax[i].xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
+      plt.show()
+
+      # sns.lineplot(data=df_results, ax=ax)
+      # ax.set_xticks(df_results.index, labels=date_labels, rotation=90)
+      # ax.xaxis.set_major_locator(plticker.MultipleLocator(TICK_SPACING))
+      # plt.xlabel('Time steps')
+      # plt.ylabel('Temp in degrees C')
+      # plt.show()
 
     # write pred results out
     df_results['pred_dates'] = date_labels
     df_results.to_csv(self.LOG_PATH + f'model-preds-{serial}.csv', index_label='index')
-
-    # Clear axis
-    ax.clear()
+    df_results.set_index('pred_dates', drop=True, inplace=True)
 
     ## """**Error Calculations**"""
 
-    y_test_vals = df_results['y_test'].values
-    preds = df_results['preds'].values
+    # y_test_vals = df_results['y_test'].values
+    # y_test_vals = df_results[self.GRAPH_LABEL].values
+    # preds = df_results['preds'].values
 
-    # Calculate MAPE
-    m = tf.keras.metrics.MeanAbsolutePercentageError()
-    try:
-      m.update_state(y_test_vals, preds)
-    except ValueError as ve:
-      print(f'ValueError calculating MAPE: {ve}')
+    # Error gathering objects
+    m = tf.keras.metrics.MeanAbsolutePercentageError()  # MAPE calculator
+    mse = []
+    rmse = []
+    mae = []
+    mape = []
+    skmape = []
 
-    mse = mean_squared_error(y_test_vals, preds)
-    rmse = np.sqrt(mse) if (mse > 0) else 0
-    mae = mean_absolute_error(y_test_vals, preds)
-    mape = m.result().numpy()/100  # adjust Keras output to match scikit
-    sk_mape = mean_absolute_percentage_error(y_test_vals, preds)
+    y_test_vals = np.asarray(y_test_vals)
+    if (len(y_test_vals.shape) > 2):
+      # need a 2D array here
+      y_test_vals = y_test_vals.reshape(-1, self.NUM_LABELS)
+    # but also need it in compatible layout
+    if (y_test_vals.shape[1] == self.NUM_LABELS):
+      y_test_vals = np.transpose(y_test_vals)
 
-    print(f'MSE: {mse}')
-    print(f'MAE: {mae}')
-    print(f'MAPE: {mape}')
-    print(f'SKMAPE: {sk_mape}')
+    print(f'### y_test_vals: {y_test_vals.shape}')
+    print(f'### preds: {preds.shape}')
+
+    # Calculate per-column errors, just for debugging purposes
+    for i, col in enumerate(df_results.columns):
+      # Accumulate error ACROSS COLUMNS, by error type
+      #   for later averaging
+      print(f'## Calculating error for col[{i}]: {col}')
+      try:
+        m.update_state(y_test_vals[i], preds[i])
+      except ValueError as ve:
+        print(f'ValueError calculating MAPE: {ve}')
+
+      msev = mean_squared_error(y_test_vals[i], preds[i])
+      rmse = (np.sqrt(msev) if (msev > 0) else 0)
+      mae = (mean_absolute_error(y_test_vals[i], preds[i]))
+      mape = (m.result().numpy()/100)  # adjust Keras output to match scikit
+      skmape = (mean_absolute_percentage_error(y_test_vals[i], preds[i]))
+      print(f'\t{col} [MSE]: {msev}')
+      print(f'\t{col} [RMSE]: {rmse}')
+      print(f'\t{col} [MAE]: {mae}')
+      print(f'\t{col} [MAPE]: {mape}')
+      if (col == self.GRAPH_LABEL):
+        MSE = msev
+        RMSE = rmse
+        MAE = mae
+        MAPE = mape
+        SKMAPE = skmape
+
+    # In the end, we only really want to know about our GRAPH_LABEL!!
+
+    # df_errs = pd.DataFrame({'mse':mse,'rmse':rmse,'mae':mae,'mape':mape,'skmape':skmape})
+    # MSE = df_errs.mse.mean()
+    # RMSE = df_errs.rmse.mean()
+    # MAE = df_errs.mae.mean()
+    # MAPE = ddf_errs.mape.mean()
+    # SKMAPE = df_errs.skmape.mean()
+    # print(f'MSE: {MSE}')
+    # print(f'RMSE: {RMSE}')
+    # print(f'MAE: {MAE}')
+    # print(f'MAPE: {MAPE}')
+    # print(f'SKMAPE: {SKMAPE}')
 
     ## """**Journal entry**"""
     with open(self.JOURNAL_LOG, 'a') as csvfile:
       writer = csv.writer(csvfile)
       #writer.writerow(['DateTime','Serial','Model','TargetLabel','NumFeatures','InputWindow','LabelWindow','Scaler','Alpha','TestPct','NumEpochs','RMSE','MSE','MAE','MAPE','SKMAPE','Columns'])
-      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABEL,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,rmse,mse,mae,mape,sk_mape,COLS])
+      writer.writerow([dt.today().strftime("%Y%m%d-%H%M"),serial,self.MODEL_NAME,self.TARGET_LABELS,NUM_FEATURES,self.INPUT_WINDOW,self.LABEL_WINDOW,self.SCALER_NAME,self.ALPHA,self.TEST_RATIO,num_epochs,RMSE,MSE,MAE,MAPE,SKMAPE,self.COLS])
 
     return serial
 

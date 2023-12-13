@@ -91,7 +91,7 @@ class Model_Transformerv1(Base_Model):
         #loss="sparse_categorical_crossentropy",
         loss= tf.keras.losses.Huber(),
         optimizer=tf.keras.optimizers.Adam(learning_rate=self.ALPHA),  # orig 1e-4
-        metrics=["sparse_categorical_accuracy"],
+        metrics=["mean_squared_error"],
         run_eagerly=False,  # for debugging
     )
     model.summary()

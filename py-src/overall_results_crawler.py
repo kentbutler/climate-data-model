@@ -38,9 +38,11 @@ JOURNAL_LOG = "cv-results.csv"
 
 # -- UNCOMMENT to load a particular result set --
 # UC1
-DATA_ROOTS = ["data/preds-s30/","data/preds-s31/","data/preds-s34/","data/preds-s35/","data/preds-s36/"]
+# DATA_ROOTS = ["data/preds-s30/","data/preds-s31/","data/preds-s34/","data/preds-s35/","data/preds-s36/"]
 # UC3
-DATA_ROOTS = ["data/preds-s28/","data/preds-s29/","data/preds-s26/"]
+# DATA_ROOTS = ["data/preds-s28/","data/preds-s29/","data/preds-s26/"]
+# UC3
+DATA_ROOTS = ["data/preds-s39/","data/preds-s40/","data/preds-s41/"]
 
 # Visualization params
 METRIC = 'RMSE'

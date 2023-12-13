@@ -101,9 +101,9 @@ GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
            'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
                           'share_global_luc_co2':'share_global_luc_co2',
                           'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
-                          'temperature_change_from_co2':'temperature_change_from_co2',
-                          'land_use_change_co2':'land_use_change_co2',
-                          'cumulative_luc_co2':'cumulative_luc_co2'},
+                          'temperature_change_from_co2':'temperature_change_from_co2'},
+                          # 'land_use_change_co2':'land_use_change_co2',},
+                          # 'cumulative_luc_co2':'cumulative_luc_co2'},
            'date_map':{'year':'year'}}
 
 SEAICE_DATA = {'filename':"seaice.csv",
@@ -156,7 +156,7 @@ NUM_EPOCHS = 300
 # History lookback in network
 #INPUT_WINDOWS = [30,48,60]
 #INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [60,84,120]
+INPUT_WINDOWS = [36,60,84,120]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
 # ALPHAS = [1e-4,5e-4,5e-5]
@@ -164,8 +164,7 @@ ALPHAS = [5e-4]
 
 # Dynamically build a scaler from name
 # SCALERS = ['StandardScaler','PowerTransformer','QuantileTransformer','RobustScaler']
-SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
-# SCALERS = ['MinMaxScaler']
+# SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
 #  Note that 'Normalizer' is not a scaler per se, it is essentially just a function
 #    to reverse it you need to retain, and multiply by, w
   # w = np.sqrt(sum(x**2))
@@ -179,14 +178,14 @@ SCALERS = ['StandardScaler','MinMaxScaler','RobustScaler']
 # SCALERS = ['StandardScaler']
 # MODEL_NAMES = ['LSTMv32']
 # Pair
-# SCALERS = ['MinMaxScaler']
+SCALERS = ['MinMaxScaler']
 # MODEL_NAMES = ['TXERv1']
 
 # Models to CV
 # 'Densev1',
 # MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
-MODEL_NAMES = ['TXERv1']
+MODEL_NAMES = ['TXERv1','LSTMv32','Densev1']
 # MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
 
 
@@ -204,8 +203,9 @@ INITIAL_DATASET = AIR_TEMP_DATA  #UC3
 
 # Label to predict
 # TARGET_LABEL = 'landSeaAvgTemp'  #UC1
-TARGET_LABEL = 'airPrefAvgTemp' #UC3
-# TARGET_LABELS = ['airPrefAvgTemp','co2']
+GRAPH_LABEL = 'airPrefAvgTemp' #UC3
+TARGET_LABELS = ['airPrefAvgTemp','co2']
+# TARGET_LABELS = ['airPrefAvgTemp']
 
 # Use case 1
 # ALL_DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA],
@@ -215,7 +215,7 @@ TARGET_LABEL = 'airPrefAvgTemp' #UC3
 # Use case 3
 # ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
 #               [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
-ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
+ALL_DATASETS=[[CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
 
 
 """# Execute Trainer"""
@@ -232,11 +232,15 @@ for n in range(NUM_LOOPS):
               # re-construct the model exec b/c it contains some state
               exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
                                   input_window=win, label_window=lab, shift=SHIFT, test_ratio=TEST_RATIO, val_ratio=VALIDATION_RATIO,
-                                  num_epochs=NUM_EPOCHS, target_labels=TARGET_LABEL, model_name=model, scaler=scaler, alpha=alpha, debug=True)
+                                  num_epochs=NUM_EPOCHS, target_labels=TARGET_LABELS, graph_label=GRAPH_LABEL, model_name=model, scaler=scaler, alpha=alpha, debug=True)
 
               exec.load_initial_dataset(INITIAL_DATASET['filename'], INITIAL_DATASET['feature_map'], date_map=None, date_col=INITIAL_DATASET['date_col'])
 
               exec.load_datasets(ds_list)
+              # exec.seasonal_decompose()
+              # exec.print_correlations()
+              # exec.acf()
+              # exec.ADF()
               #exec.print_correlations()
               exec.train()
 

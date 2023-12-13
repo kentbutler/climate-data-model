@@ -41,54 +41,55 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 # MODEL_FILENAME = '20231211-0400-Densev1-823252.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s39/"
 # MODEL_NAME = 'Densev1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
-# 685055
+# 685055 - NOT GREAT
 # INPUT_WINDOW = 84
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231210-2334-Densev1-685055.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s38/"
 # MODEL_NAME = 'Densev1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
+# 685055 - NOT BAD
 # INPUT_WINDOW = 84
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231210-2334-Densev1-685055.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s38/"
 # MODEL_NAME = 'Densev1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
-# 956965
+# 956965 - DECENT, BIG STEP UP
 # INPUT_WINDOW = 60
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231211-0347-TXERv1-956965.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s39/"
 # MODEL_NAME = 'TXERv1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
-# 971088
+# 971088 - DECENT
 # INPUT_WINDOW = 60
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231211-0235-TXERv1-971088.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s39/"
 # MODEL_NAME = 'TXERv1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
-#  263281
+#  263281 - POOR
 # INPUT_WINDOW = 84
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231211-0719-TXERv1-263281.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s40/"
 # MODEL_NAME = 'TXERv1'
-# SCALER = 'StandardScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'StandardScaler'
 
-# 50120
+# 50120 -- FLAT
 # INPUT_WINDOW = 60
 # LABEL_WINDOW = 60
 # MODEL_FILENAME = '20231211-0621-TXERv1-50120.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s40/"
 # MODEL_NAME = 'TXERv1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
 # 382025
 # INPUT_WINDOW = 120
@@ -96,7 +97,7 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 # MODEL_FILENAME = '20231211-0828-TXERv1-382025.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s40/"
 # MODEL_NAME = 'TXERv1'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
 # 451509
 # INPUT_WINDOW = 60
@@ -104,8 +105,39 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 # MODEL_FILENAME = '20231211-0400-LSTMv32-451509.hdf5'
 # MODEL_PATH = DATA_ROOT + "preds-s39/"
 # MODEL_NAME = 'LSTMv32'
-# SCALER = 'MinMaxScaler'  # 'RobustScaler' 'MinMaxScaler' 'StandardScaler'
+# SCALER = 'MinMaxScaler'
 
+# 738809 -- FLAT
+# INPUT_WINDOW = 120
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231212-0231-LSTMv32-738809.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s41/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 610789 -- FLAT
+# INPUT_WINDOW = 120
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231212-0205-LSTMv32-610789.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s41/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 370528
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231212-0236-LSTMv32-370528.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s41/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 960250
+INPUT_WINDOW = 120
+LABEL_WINDOW = 60
+MODEL_FILENAME = '20231213-0046-TXERv1-960250.hdf5'
+MODEL_PATH = DATA_ROOT + "preds-s42/"
+MODEL_NAME = 'TXERv1'
+SCALER = 'MinMaxScaler'
 
 # --------------------------------------
 
@@ -121,12 +153,10 @@ END_DATE = pd.to_datetime('2023-10-01')
 
 # How many Label Windows to predict ahead?  Balances this number w/ Label Windows BEFORE end of data;
 #   so, plan to have at least (NUM_PREDICTION_WINDOWS*LABEL_WINDOW)+INPUT_WINDOW years of data available
-NUM_PREDICTION_WINDOWS=4
+NUM_PREDICTION_WINDOWS=2
 
 """**Dataset Definitions**"""
 
-# Label to predict
-TARGET_LABEL = 'landSeaAvgTemp'
 
 # Datasets
 TEMP_DATA = {'filename':'GlobalTemperatures.csv',
@@ -185,13 +215,19 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
                'date_col':'date'}
 
 """**Run Parameters**"""
+
+# Label to predict
+# UC1
+# GRAPH_LABEL = 'landSeaAvgTemp'
+# TARGET_LABELS = 'landSeaAvgTemp'
+# UC3
+GRAPH_LABEL = 'airPrefAvgTemp'
+# TARGET_LABELS = ['airPrefAvgTemp']
+TARGET_LABELS = ['airPrefAvgTemp','co2']
+
 # Base everything on this dataset
 # INITIAL_DATASET = TEMP_DATA     #UC1
 INITIAL_DATASET = AIR_TEMP_DATA  #UC3
-
-# Label to predict
-# TARGET_LABEL = 'landSeaAvgTemp'  #UC1
-TARGET_LABEL = 'airPrefAvgTemp' #UC3
 
 # Use case 1
 # DATASETS=[[SEAICE_DATA, VOLCANO_DATA, FOREST_DATA, SUNSPOT_DATA, CO2_DATA, WEATHER_DATA]]
@@ -199,12 +235,13 @@ TARGET_LABEL = 'airPrefAvgTemp' #UC3
 # ]
 
 # Use case 3
-DATASETS=[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
+# DATASETS=[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
+DATASETS=[CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
 
 """# Set up and run Predictions """
 exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,
                     input_window=INPUT_WINDOW, label_window=LABEL_WINDOW, shift=1, test_ratio=0, val_ratio=0,
-                    num_epochs=3, target_label=TARGET_LABEL, model_name=MODEL_NAME, scaler=SCALER, alpha=ALPHA, plot=True, debug=True)
+                    num_epochs=3, target_labels=TARGET_LABELS, graph_label=GRAPH_LABEL, model_name=MODEL_NAME, scaler=SCALER, alpha=ALPHA, plot=True, debug=True)
 
 exec.load_initial_dataset(INITIAL_DATASET['filename'], INITIAL_DATASET['feature_map'], date_map=None, date_col=INITIAL_DATASET['date_col'])
 exec.load_datasets(DATASETS)

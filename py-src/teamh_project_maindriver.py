@@ -135,7 +135,7 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 debug = False
 # show_graphics = True
 predict = False
-NUM_LOOPS = 10
+NUM_LOOPS = 5
 
 """**Hyperparams**"""
 
@@ -155,8 +155,8 @@ NUM_EPOCHS = 300
 
 # History lookback in network
 #INPUT_WINDOWS = [30,48,60]
-#INPUT_WINDOWS = [24,36,48]
-INPUT_WINDOWS = [36,60,84,120]
+INPUT_WINDOWS = [24]
+# INPUT_WINDOWS = [36,60,84,120]
 LABEL_WINDOWS = [60]
 # ALPHAS = [5e-3,1e-4,5e-4,1e-5,5e-5]
 # ALPHAS = [1e-4,5e-4,5e-5]
@@ -185,7 +185,8 @@ SCALERS = ['MinMaxScaler']
 # 'Densev1',
 # MODEL_NAMES = ['Densev1','Densev11','TXERv1','LSTMv3','LSTMv31','LSTMv32']
 # MODEL_NAMES = ['Densev1','Densev11','LSTMv3']
-MODEL_NAMES = ['TXERv1','LSTMv32','Densev1']
+MODEL_NAMES = ['TXERv1']
+# MODEL_NAMES = ['TXERv1']
 # MODEL_NAMES = ['Densev1','TXERv1','LSTMv32']
 
 
@@ -204,7 +205,7 @@ INITIAL_DATASET = AIR_TEMP_DATA  #UC3
 # Label to predict
 # TARGET_LABEL = 'landSeaAvgTemp'  #UC1
 GRAPH_LABEL = 'airPrefAvgTemp' #UC3
-TARGET_LABELS = ['airPrefAvgTemp','co2']
+TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','share_global_luc_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
 # TARGET_LABELS = ['airPrefAvgTemp']
 
 # Use case 1
@@ -215,7 +216,7 @@ TARGET_LABELS = ['airPrefAvgTemp','co2']
 # Use case 3
 # ALL_DATASETS=[[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA],
 #               [CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
-ALL_DATASETS=[[CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]]
+ALL_DATASETS=[[CO2_ICE_DATA, SEA_TEMP_DATA, GHG_HIST_DATA, AIR_TEMP_DATA]]
 
 
 """# Execute Trainer"""

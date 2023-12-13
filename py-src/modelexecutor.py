@@ -505,7 +505,8 @@ class ModelExecutor():
             cur_start_idx = cur_start_idx - self.CYCLE_LENGTH[self.STEP_FREQ]
             print(f'Trying cur_start_idx: {cur_start_idx}')
             # did we go back far enough to fit in a label-width of data?
-            if ((start_idx - cur_start_idx) >= missing_data_len):
+            if (((start_idx - cur_start_idx) >= missing_data_len) and
+                (cur_start_idx + missing_data_len) <= last_data_idx):
               found = True
 
           cur_end_idx = cur_start_idx + missing_data_len
@@ -513,10 +514,12 @@ class ModelExecutor():
           df_extract = df_input.iloc[cur_start_idx:cur_end_idx,:].copy()
           # print(f'## df_extract: {df_extract.shape}')
           # print(f'## df_extract last: {df_extract.index[-1]}')
+          print(f'## df_extract: {df_extract.shape}')
 
           # Create the proper date index for the chunk we want to add -
           #   and inject into df_input for later selection
           missing_date_end = missing_date_start + ((self.LABEL_WINDOW-1) * STEP_OFFSET)
+          print(f'Pulling data from {missing_date_start} to {missing_date_end} - diff: {missing_date_start-missing_date_end}')
           date_index = pd.date_range(missing_date_start, missing_date_end, freq='MS', normalize=True)
           # print(f'## date_index: {date_index}')
           df_extract['newidx'] = date_index

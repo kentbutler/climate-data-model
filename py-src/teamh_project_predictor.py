@@ -14,7 +14,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
-plt.rcParams["figure.figsize"] = (10,6)
 import warnings
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn')
@@ -132,12 +131,116 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 # SCALER = 'MinMaxScaler'
 
 # 960250
-INPUT_WINDOW = 120
-LABEL_WINDOW = 60
-MODEL_FILENAME = '20231213-0046-TXERv1-960250.hdf5'
-MODEL_PATH = DATA_ROOT + "preds-s42/"
-MODEL_NAME = 'TXERv1'
-SCALER = 'MinMaxScaler'
+# INPUT_WINDOW = 120
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0046-TXERv1-960250.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s42/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 237996 - best TXER
+# INPUT_WINDOW = 36
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0202-TXERv1-237996.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 469862 - 2nd-best TXER
+# INPUT_WINDOW = 36
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0323-TXERv1-469862.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 143389 - series best Dense
+# INPUT_WINDOW = 36
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0059-Densev1-143389.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'Densev1'
+# SCALER = 'MinMaxScaler'
+
+# 358649 - wide TXER
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0103-TXERv1-358649.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 615785
+# INPUT_WINDOW = 120
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0106-TXERv1-615785.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 17695
+# INPUT_WINDOW = 84
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0104-LSTMv32-17695.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 643981
+# INPUT_WINDOW = 36
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0058-LSTMv32-643981.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s43/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 466828
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0908-TXERv1-466828.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s44/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 940023
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0936-LSTMv32-940023.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s44/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 23628
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-0902-Densev1-23628.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s44/"
+# MODEL_NAME = 'Densev1'
+# SCALER = 'MinMaxScaler'
+
+# 963309
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-1017-LSTMv32-963309.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s45/"
+# MODEL_NAME = 'LSTMv32'
+# SCALER = 'MinMaxScaler'
+
+# 30193
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-1016-TXERv1-30193.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s45/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
+
+# 722188
+# INPUT_WINDOW = 24
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231213-1057-TXERv1-722188.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s46/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
 
 # --------------------------------------
 
@@ -153,7 +256,7 @@ END_DATE = pd.to_datetime('2023-10-01')
 
 # How many Label Windows to predict ahead?  Balances this number w/ Label Windows BEFORE end of data;
 #   so, plan to have at least (NUM_PREDICTION_WINDOWS*LABEL_WINDOW)+INPUT_WINDOW years of data available
-NUM_PREDICTION_WINDOWS=2
+NUM_PREDICTION_WINDOWS=8
 
 """**Dataset Definitions**"""
 
@@ -222,8 +325,11 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 # TARGET_LABELS = 'landSeaAvgTemp'
 # UC3
 GRAPH_LABEL = 'airPrefAvgTemp'
-# TARGET_LABELS = ['airPrefAvgTemp']
-TARGET_LABELS = ['airPrefAvgTemp','co2']
+TARGET_LABELS = ['airPrefAvgTemp']
+# TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','share_global_luc_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
+
+# TARGET_LABELS = ['airPrefAvgTemp','co2']
+# TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp']
 
 # Base everything on this dataset
 # INITIAL_DATASET = TEMP_DATA     #UC1
@@ -235,8 +341,8 @@ INITIAL_DATASET = AIR_TEMP_DATA  #UC3
 # ]
 
 # Use case 3
-# DATASETS=[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
-DATASETS=[CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
+DATASETS=[CO2_ICE_DATA, GHG_HIST_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
+# DATASETS=[CO2_ICE_DATA, SEA_TEMP_DATA, AIR_TEMP_DATA]
 
 """# Set up and run Predictions """
 exec = ModelExecutor(data_path=DATA_ROOT, log_path=LOG_PATH, journal_log=JOURNAL_LOG, start_date=START_DATE, end_date=END_DATE,

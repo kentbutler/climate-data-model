@@ -33,12 +33,12 @@ colors = 'rbygm'
 
 ## Run parameters
 debug = False
-RMSE_THRESHOLD = 0.18
+RMSE_THRESHOLD = 0.28
 
 # Plot a certain result??  0 for all
 SHOW_SERIAL = 0  # set to 0 to show just the best
 # -- UNCOMMENT to load a particular result set --
-DATA_ROOT = DRIVE_PATH + "data/preds-s41/"
+DATA_ROOT = DRIVE_PATH + "data/preds-s44/"
 JOURNAL_LOG = DATA_ROOT + "cv-results.csv"
 
 ## ###############################

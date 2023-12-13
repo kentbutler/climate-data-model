@@ -110,8 +110,8 @@ on the result directory will produce graphical summaries like the following:
 
 Model files, metadata and metrics for each individual run is also recorded. Observing these can be done with this same script using the test serial number, available in `cv-results.csv`, or by setting a METRIC threshold, which will locate and graph all results better than the threshold. That will produce a specific graphical summary like the following:
 
-img-preds35-summary.png
-![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds38-bestfit.png?raw=true)
+
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/img-preds35-summary.png?raw=true)
 
 
 Running inference using a trained model can be done by executing

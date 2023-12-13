@@ -7,7 +7,8 @@ This project implements an agile data modeling framework with a focus on climate
 
 The class structure looks like
 
-![alt text](https://github.com/kentbutler/climate-data-model/blob/main/ClassDiagram.jpg?raw=true)
+![alt text](https://github.com/kentbutler/climate-data-model/blob/main/images/ClassDiagram.jpg?raw=true)
+
 
 and you can see descriptions of the CLI in the `Scripts` section.
 

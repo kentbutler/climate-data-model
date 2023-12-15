@@ -9,7 +9,7 @@ Original file is located at
 ---
 
 ## Transformer Model v1
-
+Based on https://keras.io/examples/timeseries/timeseries_classification_transformer/.
 ---
 
 Basic usage of a Transformer.

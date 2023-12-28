@@ -99,7 +99,7 @@ CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
 
 GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
            'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
-                          'share_global_luc_co2':'share_global_luc_co2',
+                          'land_use_change_co2':'land_use_change_co2',
                           'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
                           'temperature_change_from_co2':'temperature_change_from_co2'},
                           # 'land_use_change_co2':'land_use_change_co2',},
@@ -139,13 +139,14 @@ NUM_LOOPS = 5
 
 """**Hyperparams**"""
 
-SHIFT = 1
 # Ratio of test data to train data - used for split
 TEST_RATIO = 0.2
 # 0..1 percent of data to use as validation
 VALIDATION_RATIO = 0
 # Num epochs
 NUM_EPOCHS = 300
+# currently unused
+SHIFT=1
 
 # NOTE: this is a tempting workaround to stop graphic popups, but it is deceptive.
 #     This will launch an empty frame per loop
@@ -198,14 +199,15 @@ MODEL_NAMES = ['TXERv1']
 START_DATE =  pd.to_datetime('1850-01-01')
 END_DATE = pd.to_datetime('2023-10-01')
 
-# Base everything on this dataset
+# Begin with this dataset, and match its periodicity
 # INITIAL_DATASET = TEMP_DATA     #UC1
 INITIAL_DATASET = AIR_TEMP_DATA  #UC3
 
 # Label to predict
 # TARGET_LABEL = 'landSeaAvgTemp'  #UC1
 GRAPH_LABEL = 'airPrefAvgTemp' #UC3
-TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','share_global_luc_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
+# Labels to include in inference; will be predicted an rolled back into dataset during autoregression
+TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','land_use_change_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
 # TARGET_LABELS = ['airPrefAvgTemp']
 
 # Use case 1

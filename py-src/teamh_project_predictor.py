@@ -67,12 +67,12 @@ JOURNAL_LOG = SCRIPT_PATH + "cv-results.csv"
 # SCALER = 'MinMaxScaler'
 
 # 971088 - DECENT
-INPUT_WINDOW = 60
-LABEL_WINDOW = 60
-MODEL_FILENAME = '20231211-0235-TXERv1-971088.hdf5'
-MODEL_PATH = DATA_ROOT + "preds-s39/"
-MODEL_NAME = 'TXERv1'
-SCALER = 'MinMaxScaler'
+# INPUT_WINDOW = 60
+# LABEL_WINDOW = 60
+# MODEL_FILENAME = '20231211-0235-TXERv1-971088.hdf5'
+# MODEL_PATH = DATA_ROOT + "preds-s39/"
+# MODEL_NAME = 'TXERv1'
+# SCALER = 'MinMaxScaler'
 
 #  263281 - POOR
 # INPUT_WINDOW = 84
@@ -235,12 +235,12 @@ SCALER = 'MinMaxScaler'
 # SCALER = 'MinMaxScaler'
 
 # 722188
-# INPUT_WINDOW = 24
-# LABEL_WINDOW = 60
-# MODEL_FILENAME = '20231213-1057-TXERv1-722188.hdf5'
-# MODEL_PATH = DATA_ROOT + "preds-s46/"
-# MODEL_NAME = 'TXERv1'
-# SCALER = 'MinMaxScaler'
+INPUT_WINDOW = 24
+LABEL_WINDOW = 60
+MODEL_FILENAME = '20231213-1057-TXERv1-722188.hdf5'
+MODEL_PATH = DATA_ROOT + "preds-s46/"
+MODEL_NAME = 'TXERv1'
+SCALER = 'MinMaxScaler'
 
 # --------------------------------------
 
@@ -286,7 +286,6 @@ CO2_ICE_DATA = {'filename':"co2-daily-millenia-groomed.csv",
 
 GHG_HIST_DATA = {'filename':'owid-co2-data-groomed.csv',
            'feature_map':{'share_global_cumulative_luc_co2':'share_global_cumulative_luc_co2',
-                          'share_global_luc_co2':'share_global_luc_co2',
                           'share_of_temperature_change_from_ghg':'share_of_temperature_change_from_ghg',
                           'temperature_change_from_co2':'temperature_change_from_co2',
                           'land_use_change_co2':'land_use_change_co2',
@@ -325,8 +324,8 @@ POLICY_DATA = {'filename':'GlobalEnvPolicies.csv',
 # TARGET_LABELS = 'landSeaAvgTemp'
 # UC3
 GRAPH_LABEL = 'airPrefAvgTemp'
-TARGET_LABELS = ['airPrefAvgTemp']
-# TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','share_global_luc_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
+# TARGET_LABELS = ['airPrefAvgTemp']
+TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp','share_global_cumulative_luc_co2','land_use_change_co2','share_of_temperature_change_from_ghg','temperature_change_from_co2']
 
 # TARGET_LABELS = ['airPrefAvgTemp','co2']
 # TARGET_LABELS = ['airPrefAvgTemp','co2','seaPrefAvgTemp']
